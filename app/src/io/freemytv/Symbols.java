@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
-import android.util.SparseArray;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,8 +15,9 @@ import java.util.Map;
 /**
  * Material Symbols Rounded icons (Apache 2.0), rendered by tools/make_symbols.py as white PNGs in assets/symbols. Drawn
  * like text: `pointSize` is the size of the font next to the icon, and the icon is centered on that font's cap height.
- * Each size is scaled down once (in steps of at most 2×) and drawn pixel for pixel at a whole-pixel position: a GPU
- * shrinking a ~150 px PNG to 40 px in one bilinear step skips pixels, and the edges come out jagged.
+ * The sizes the layout uses are scaled down ahead of time (warm, in steps of at most 2×) and drawn pixel for pixel at a
+ * whole-pixel position: a GPU shrinking a ~150 px PNG to 40 px in one bilinear step skips pixels, and the edges come
+ * out jagged. Drawing never makes a bitmap: a size in between (a focus animation) is the closest larger copy, filtered.
  */
 final class Symbols {
     private Symbols() {}
@@ -28,8 +28,10 @@ final class Symbols {
      */
     private static final float PX_PER_POINT = 96 * 1.5f;
     private static final Map<String, Bitmap> CACHE = new HashMap<>();
-    /** Scaled copies, by name and then by pixel size (width << 16 | height); only touched holding PAINT. */
-    private static final Map<String, SparseArray<Bitmap>> SIZED = new HashMap<>();
+    /** Scaled copies per symbol, newest first; only touched holding PAINT. A few: the layout's sizes change with the
+     *  screen and the language, never per frame, and the oldest one goes. */
+    private static final int SIZES = 6;
+    private static final Map<String, Bitmap[]> SIZED = new HashMap<>();
     private static final Paint PAINT = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private static final RectF RECT = new RectF();
 
@@ -69,42 +71,45 @@ final class Symbols {
         }
     }
 
-    /** Scales a size ahead of time (the layout step), so the first frame that draws it doesn't. */
+    /** Scales `pointSize` ahead of time (the layout step, or a background thread), so drawing it is pixel for pixel. */
     static void warm(Context c, String name, float pointSize) {
-        Bitmap b = get(c, name);
+        Bitmap b = pointSize > 0 ? get(c, name) : null;   // 0 before the first layout
         if (b == null) return;
+        int w = px(b.getWidth(), pointSize), h = px(b.getHeight(), pointSize);
+        if (w >= b.getWidth() || h >= b.getHeight()) return;   // full size or larger: the PNG itself
         synchronized (PAINT) {
-            sized(name, b, pointSize);
+            Bitmap[] sizes = SIZED.get(name);
+            if (sizes == null) SIZED.put(name, sizes = new Bitmap[SIZES]);
+            for (Bitmap s : sizes) if (s != null && s.getWidth() == w && s.getHeight() == h) return;
+            Bitmap s = b;
+            while (s.getWidth() / 2 >= w && s.getHeight() / 2 >= h) s = Bitmap.createScaledBitmap(s, s.getWidth() / 2, s.getHeight() / 2, true);
+            System.arraycopy(sizes, 0, sizes, 1, SIZES - 1);
+            sizes[0] = Bitmap.createScaledBitmap(s, w, h, true);
         }
+    }
+
+    private static int px(int png, float pointSize) {
+        return Math.max(1, Math.round(png * pointSize / PX_PER_POINT));
     }
 
     private static void drawLocked(Canvas canvas, String name, Bitmap b, float cx, float cy, float pointSize, int color) {
         PAINT.setColor(color);
-        Bitmap s = sized(name, b, pointSize);
-        if (s != null) {
-            canvas.drawBitmap(s, Math.round(cx - s.getWidth() / 2f), Math.round(cy - s.getHeight() / 2f), PAINT);
+        int w = px(b.getWidth(), pointSize), h = px(b.getHeight(), pointSize);
+        // The smallest copy at least this size (the PNG when there's none).
+        Bitmap s = b;
+        Bitmap[] sizes = SIZED.get(name);
+        if (sizes != null) {
+            for (Bitmap z : sizes) {
+                if (z != null && z.getWidth() >= w && z.getHeight() >= h && z.getWidth() < s.getWidth()) s = z;
+            }
+        }
+        if (s != b && s.getWidth() == w && s.getHeight() == h) {
+            canvas.drawBitmap(s, Math.round(cx - w / 2f), Math.round(cy - h / 2f), PAINT);
             return;
         }
-        float w = b.getWidth() * pointSize / PX_PER_POINT, h = b.getHeight() * pointSize / PX_PER_POINT;
-        RECT.set(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2);
-        canvas.drawBitmap(b, null, RECT, PAINT);
-    }
-
-    /** The symbol scaled down to `pointSize` (made once per size), or null when it is drawn at full size or larger. */
-    private static Bitmap sized(String name, Bitmap b, float pointSize) {
-        int w = Math.max(1, Math.round(b.getWidth() * pointSize / PX_PER_POINT));
-        int h = Math.max(1, Math.round(b.getHeight() * pointSize / PX_PER_POINT));
-        if (w >= b.getWidth() || h >= b.getHeight()) return null;
-        SparseArray<Bitmap> sizes = SIZED.get(name);
-        if (sizes == null) SIZED.put(name, sizes = new SparseArray<>());
-        int key = w << 16 | h;
-        Bitmap s = sizes.get(key);
-        if (s != null) return s;
-        s = b;
-        while (s.getWidth() / 2 >= w && s.getHeight() / 2 >= h) s = Bitmap.createScaledBitmap(s, s.getWidth() / 2, s.getHeight() / 2, true);
-        s = Bitmap.createScaledBitmap(s, w, h, true);
-        sizes.put(key, s);
-        return s;
+        float fw = b.getWidth() * pointSize / PX_PER_POINT, fh = b.getHeight() * pointSize / PX_PER_POINT;
+        RECT.set(cx - fw / 2, cy - fh / 2, cx + fw / 2, cy + fh / 2);
+        canvas.drawBitmap(s, null, RECT, PAINT);
     }
 
     // Weather colors, like Apple's Weather: {on light glass, on dark glass}.
@@ -139,6 +144,14 @@ final class Symbols {
         warm(c, name, pointSize);
         warm(c, name + "_cloud", pointSize);   // missing for one-part symbols: nothing to scale
         warm(c, name + "_accent", pointSize);
+    }
+
+    /** Every symbol weather() returns, in one color, warmed at `pointSize` (a card shows whichever the forecast brings). */
+    static void warmWeather(Context c, float pointSize) {
+        for (String name : new String[] {"sunny", "clear_night", "partly_cloudy_day", "partly_cloudy_night", "cloud",
+                "foggy", "rainy", "snowflake", "thunderstorm"}) {
+            warm(c, name, pointSize);
+        }
     }
 
     private static int tone(int[] pair, float dark) {
