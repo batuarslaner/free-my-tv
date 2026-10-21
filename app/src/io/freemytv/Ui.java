@@ -29,11 +29,12 @@ final class Ui {
     static final boolean LEGACY = Build.VERSION.SDK_INT < 31;
     static final Locale RU = new Locale("ru", "RU");
     static final Locale PT = new Locale("pt", "BR");
-    /** English, Portuguese, Spanish, German or Russian, from the settings or, with "auto", the TV's own language. */
+    static final Locale TR = new Locale("tr", "TR");
+    /** English, Portuguese, Spanish, German, Russian or Turkish, from the settings or, with "auto", the TV's own language. */
     static volatile String language = language();
     static volatile boolean en = "en".equals(language), es = "es".equals(language), de = "de".equals(language),
-            ru = "ru".equals(language);
-    static Typeface thin, light, displayMedium, displaySemibold, regular, medium, semibold;
+            ru = "ru".equals(language), tr = "tr".equals(language);
+    static Typeface thin, light, displayMedium, displaySemibold, displayBold, regular, medium, semibold, bold;
     private static boolean loaded;
     private static final Rect BOUNDS = new Rect();
     private static final RectF OVAL = new RectF();
@@ -46,9 +47,11 @@ final class Ui {
         light = font(a, 32, 300);
         displayMedium = font(a, 32, 500);
         displaySemibold = font(a, 32, 600);
+        displayBold = font(a, 32, 700);
         regular = font(a, 14, 400);
         medium = font(a, 14, 500);
         semibold = font(a, 14, 600);
+        bold = font(a, 14, 700);
     }
 
     /** Inter at an optical size (14 = text, 32 = display) and weight; the system font if the file is missing. */
@@ -66,12 +69,12 @@ final class Ui {
 
     private static final String FONT = "fonts/InterVariable.ttf";
 
-    /** "pt", "es", "de", "ru" or "en": the one picked (TV settings or config.properties), or with "auto" the TV's own, else English. */
+    /** "pt", "es", "de", "ru", "tr" or "en": the one picked (TV settings or config.properties), or with "auto" the TV's own, else English. */
     private static String language() {
         String lang = Prefs.language();
         if (!lang.equals("auto")) return lang;
         lang = Locale.getDefault().getLanguage();
-        return "pt".equals(lang) || "es".equals(lang) || "de".equals(lang) || "ru".equals(lang) ? lang : "en";
+        return "pt".equals(lang) || "es".equals(lang) || "de".equals(lang) || "ru".equals(lang) || "tr".equals(lang) ? lang : "en";
     }
 
     /** After the language changes in the settings (and once Prefs can read them). */
@@ -81,6 +84,7 @@ final class Ui {
         es = "es".equals(language);
         de = "de".equals(language);
         ru = "ru".equals(language);
+        tr = "tr".equals(language);
     }
 
     private static boolean has(AssetManager a, String path) {
@@ -97,6 +101,11 @@ final class Ui {
         p.setTextSize(size);
         p.setColor(color);
         return p;
+    }
+
+    /** One weight up (Text size: Large): regular to medium, medium to semibold, semibold to bold. */
+    static Typeface heavier(Typeface face) {
+        return face == regular ? medium : face == medium ? semibold : face == semibold ? bold : face;
     }
 
     /** Fixed-width digits (the clock and the prices don't jitter when a digit changes). */
@@ -138,16 +147,16 @@ final class Ui {
     }
 
     static String tr(String pt, String english) {
-        return de ? German.text(english) : ru ? Russian.text(english) : es ? Spanish.text(english) : en ? english : pt;
+        return de ? German.text(english) : ru ? Russian.text(english) : tr ? Turkish.text(english) : es ? Spanish.text(english) : en ? english : pt;
     }
 
-    /** German comes from German.java here too (keyed by the English, with patterns for text built at runtime). */
+    /** German and Turkish come from German.java and Turkish.java here too (keyed by the English, with patterns for text built at runtime). */
     static String tr(String pt, String english, String spanish) {
-        return de ? German.text(english) : ru ? Russian.text(english) : es ? spanish : en ? english : pt;
+        return de ? German.text(english) : ru ? Russian.text(english) : tr ? Turkish.text(english) : es ? spanish : en ? english : pt;
     }
 
     static Locale locale() {
-        return ru ? RU : es ? spanish() : de ? german() : en ? Locale.US : PT;
+        return ru ? RU : tr ? turkish() : es ? spanish() : de ? german() : en ? Locale.US : PT;
     }
 
     /** The TV's own Spanish (es-MX, es-AR…) when it is in Spanish, Spain's otherwise. */
@@ -160,6 +169,12 @@ final class Ui {
     private static Locale german() {
         Locale tv = Locale.getDefault();
         return "de".equals(tv.getLanguage()) ? tv : Locale.GERMANY;
+    }
+
+    /** The TV's own Turkish when it is in Turkish, Turkey's otherwise. */
+    private static Locale turkish() {
+        Locale tv = Locale.getDefault();
+        return "tr".equals(tv.getLanguage()) ? tv : TR;
     }
 
     /** "21:47" (in English, "9:47", like the iPhone in the US). */
@@ -193,9 +208,10 @@ final class Ui {
         }
     }
 
-    /** "domingo, 18 de outubro" (lowercase, like the iPhone in Portuguese); "Sunday, October 18" in English; "Sonntag, 18. Oktober". */
+    /** "domingo, 18 de outubro" (lowercase, like the iPhone in Portuguese); "Sunday, October 18" in English; "Sonntag, 18. Oktober"; "18 Ekim Pazar". */
     static String date(long now) {
         return ru ? new SimpleDateFormat("EEEE, d MMMM", locale()).format(new Date(now))
+                : tr ? new SimpleDateFormat("d MMMM EEEE", locale()).format(new Date(now))
                 : en ? new SimpleDateFormat("EEEE, MMMM d", Locale.US).format(new Date(now))
                 : new SimpleDateFormat(de ? "EEEE, d. MMMM" : "EEEE, d 'de' MMMM", locale()).format(new Date(now));
     }

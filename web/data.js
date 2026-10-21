@@ -46,6 +46,8 @@ var Prefs = (function () {
     language: function () { return pick('language', CONFIG.language || 'auto'); },
     temperature: function () { return pick('temperature', CONFIG.temperature || 'auto'); },
     theme: function () { return pick('theme', 'auto'); },
+    look: function () { return pick('look', CONFIG.look === 'sharp' ? 'sharp' : 'glass'); },
+    textSize: function () { return pick('textSize', CONFIG.textSize === 'large' ? 'large' : 'normal'); },
     weather: function () { return pick('weather', true); },
     quotes: function () { return pick('quotes', CONFIG.showCrypto !== false); },
     coin: function (i) { var c = pick('coins', null); return c ? c[i] !== false : true; },
@@ -287,7 +289,9 @@ var Data = (function () {
     es: {'Action & Adventure': 'Acción y Aventura', 'Sci-Fi & Fantasy': 'Ciencia ficción y Fantasía', 'War & Politics': 'Guerra y Política',
       'Kids': 'Infantil', 'News': 'Noticias', 'Soap': 'Telenovela', 'Talk': 'Entrevistas'},
     de: {'Action & Adventure': 'Action & Abenteuer', 'War & Politics': 'Krieg & Politik', 'Kids': 'Kinder', 'News': 'Nachrichten',
-      'Soap': 'Seifenoper', 'Talk': 'Talkshow'}
+      'Soap': 'Seifenoper', 'Talk': 'Talkshow'},
+    tr: {'Action & Adventure': 'Aksiyon ve Macera', 'Sci-Fi & Fantasy': 'Bilim Kurgu ve Fantastik', 'War & Politics': 'Savaş ve Politika',
+      'Kids': 'Çocuk', 'News': 'Haber', 'Soap': 'Pembe Dizi', 'Talk': 'Talk Show'}
   };
 
   /** The best backdrop: no text over it, the largest, then the best rated. */
@@ -317,7 +321,7 @@ var Data = (function () {
       }
       if (p.kind === 'movie' && o.runtime > 0) {
         var h = Math.floor(o.runtime / 60), m = o.runtime % 60;
-        parts.push(I18N.lang === 'ru' ? (h ? h + ' ч ' + m + ' мин' : m + ' мин') : I18N.lang === 'en' ? (h ? h + 'h ' + m + 'm' : m + 'm') : (h ? h + ' h ' + m + ' min' : m + ' min'));
+        parts.push(I18N.lang === 'ru' ? (h ? h + ' ч ' + m + ' мин' : m + ' мин') : I18N.lang === 'tr' ? (h ? h + ' sa ' + m + ' dk' : m + ' dk') : I18N.lang === 'en' ? (h ? h + 'h ' + m + 'm' : m + 'm') : (h ? h + ' h ' + m + ' min' : m + ' min'));
       } else if (p.kind === 'tv' && o.number_of_seasons > 0) {
         var n = o.number_of_seasons;
         parts.push(I18N.lang === 'ru' ? I18N.count(n, 'сезон', 'сезона', 'сезонов') : tr(n === 1 ? '1 temporada' : n + ' temporadas', n === 1 ? '1 season' : n + ' seasons', n === 1 ? '1 temporada' : n + ' temporadas'));
@@ -499,6 +503,7 @@ var Data = (function () {
 
     compact: function (v) {
       if (isNaN(v)) return '—';
+      if (v >= 1000000) return fmt(v / 1000000, 2) + 'M';
       if (v >= 10000) return fmt(v / 1000, 1) + 'k';
       if (v >= 1000) return fmt(v / 1000, 2) + 'k';
       if (v >= 100) return fmt(v, 0);
@@ -520,7 +525,7 @@ var Data = (function () {
       var d = new Date(at), h = d.getHours();
       if (I18N.lang === 'en') return (h % 12 || 12) + (h < 12 ? ' AM' : ' PM');
       if (I18N.lang === 'de') return (h < 10 ? '0' : '') + h + ' Uhr';
-      return (I18N.lang === 'es' || I18N.lang === 'ru') ? (h < 10 ? '0' : '') + h + ':00' : h + 'h';
+      return (I18N.lang === 'es' || I18N.lang === 'ru' || I18N.lang === 'tr') ? (h < 10 ? '0' : '') + h + ':00' : h + 'h';
     },
     time: function (at) {
       var d = new Date(at), h = d.getHours(), m = d.getMinutes();

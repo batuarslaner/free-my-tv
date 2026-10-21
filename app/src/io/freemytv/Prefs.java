@@ -25,7 +25,9 @@ final class Prefs {
     static final int KEY_NETFLIX = 4062, KEY_YOUTUBE = 190, KEY_PRIME = 4099, KEY_TCL_CHANNEL = 4020;
     /** Vestel's Netflix button: STEM_1, which the TV hands to its Netflix key receiver (dumpsys window policy). */
     static final int KEY_VESTEL_NETFLIX = KeyEvent.KEYCODE_STEM_1;
-    static final int[] KEYS = RemoteKeys.VESTEL ? new int[] {KEY_VESTEL_NETFLIX}
+    /** KTC's (NextStar) Tabii button: BUTTON_8, which the TV hands to its hot-key receiver (its log: "keycode = 195"). */
+    static final int KEY_KTC_TABII = KeyEvent.KEYCODE_BUTTON_8;
+    static final int[] KEYS = RemoteKeys.VESTEL ? new int[] {KEY_VESTEL_NETFLIX} : RemoteKeys.KTC ? new int[] {KEY_KTC_TABII}
             : new int[] {KEY_NETFLIX, KEY_YOUTUBE, KEY_PRIME, KEY_TCL_CHANNEL};
 
     /** Bumped by every change: screens compare it to know when to redraw. */
@@ -55,12 +57,12 @@ final class Prefs {
 
     // MARK: - Language and units
 
-    /** "auto", "pt", "en", "es", "de" or "ru". */
+    /** "auto", "pt", "en", "es", "de", "ru" or "tr". */
     static String language() {
         String v = app == null ? Config.LANGUAGE : sp().getString("language", Config.LANGUAGE);
         v = v.trim().toLowerCase(Locale.ROOT);
         return v.startsWith("ru") ? "ru" : v.startsWith("pt") ? "pt" : v.startsWith("es") ? "es" : v.startsWith("de") ? "de"
-                : v.startsWith("en") ? "en" : "auto";
+                : v.startsWith("tr") ? "tr" : v.startsWith("en") ? "en" : "auto";
     }
 
     static void setLanguage(String v) { put("language", v); Ui.applyLanguage(); }
@@ -80,6 +82,30 @@ final class Prefs {
     }
 
     static void setTheme(String v) { put("theme", v); }
+
+    /** "glass" (frosted glass) or "sharp" (flat panels, hairline borders, more contrast). */
+    static String look() {
+        String v = sp().getString("look", Config.LOOK).trim().toLowerCase(Locale.ROOT);
+        return v.equals("sharp") ? "sharp" : "glass";
+    }
+
+    static void setLook(String v) { put("look", v); }
+
+    /** "normal" or "large" (the home screen's smaller text, bigger and a little bolder). */
+    static String textSize() {
+        String v = sp().getString("textSize", Config.TEXT_SIZE).trim().toLowerCase(Locale.ROOT);
+        return v.equals("large") ? "large" : "normal";
+    }
+
+    static void setTextSize(String v) { put("textSize", v); }
+
+    /** What the TV shows when it turns on: "home" (the home screen) or "live" (live TV). */
+    static String powerOn() {
+        String v = sp().getString("powerOn", Config.POWER_ON).trim().toLowerCase(Locale.ROOT);
+        return v.equals("live") ? "live" : "home";
+    }
+
+    static void setPowerOn(String v) { put("powerOn", v); }
 
     // MARK: - City
 

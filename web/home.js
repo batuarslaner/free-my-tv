@@ -1,7 +1,7 @@
 /*
  * The home screen for web-app TVs (LG webOS, Samsung Tizen), with the Android app's design and behavior (HomeView):
- *  - top: the "For You" title and the tabs (Explore, Movies, Shows); icon-only glass buttons at the right (Live TV,
- *    HDMI Inputs, Settings) and the crypto quotes at the end of the tab row;
+ *  - top: the "For You" title and the tabs (Explore, Movies, Shows); the weather at the right, on the background like
+ *    the title, and the crypto quotes on the tab row, left of the weather;
  *  - three picks for this hour in the selected tab; the background is the first one's photo, blurred and almost white;
  *  - the glass shelf with the apps; ↓ opens the drawer (inputs, shortcuts, weather, prices); ↑ or Back closes it;
  *  - a night look from sunset to sunrise; a screensaver after a few idle minutes.
@@ -145,9 +145,6 @@
       setClass(list[i], 'on', i === st.tab);
       setClass(list[i], 'focus', st.zone === Z.TOP && st.top === i);
     }
-    list = $('buttons').children;
-    for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.TOP && st.top === 3 + i);
-    setClass($('quotes'), 'hide', st.zone === Z.TOP && st.top >= 3);
     list = $('cards').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.CARDS && st.card === i);
     list = $('tiles').children;
@@ -187,7 +184,7 @@
     return (r.left + r.right) / 2;
   }
 
-  // MARK: - Top: title, tabs, buttons, quotes
+  // MARK: - Top: title, tabs, weather, quotes
 
   var TAB_KIND = [null, 'movie', 'tv'];
 
@@ -200,17 +197,59 @@
       var t = el('button', 'tab', tabs, names[i]);
       hover(t, Z.TOP, i);
     }
-    var buttons = $('buttons');
-    buttons.innerHTML = '';
-    var defs = [['live_tv', tr('TV aberta', 'Live TV', 'TV en vivo')], ['hdmi', tr('Entradas HDMI', 'HDMI Inputs', 'Entradas HDMI')],
-      ['settings', tr('Ajustes', 'Settings', 'Ajustes')]];
-    for (var b = 0; b < 3; b++) {
-      var r = el('button', 'round' + (b === 2 ? ' last' : ''), buttons);
-      r.style.left = (1596 + 88 * b) + 'px';
-      sym(defs[b][0], r);
-      el('div', 'tip', r, defs[b][1]);
-      hover(r, Z.TOP, 3 + b);
+    renderWeatherTop();
+  }
+
+  function weatherOn() { return Prefs.weather() && !!Data.weather; }
+
+  // Weather symbols in two parts (NAME_cloud, NAME_accent: tools/make_symbols.py), each in its own color.
+  var TWO_TONE = {partly_cloudy_day: 1, partly_cloudy_night: 1, rainy: 1, thunderstorm: 1};
+
+  /**
+   * The weather at the top right, part of the header (not focusable): the colored symbol and the temperature on the
+   * title's baseline; city · condition and the high and low on the tabs' baseline. Hidden without weather.
+   */
+  function renderWeatherTop() {
+    var top = $('wx'), w = Data.weather, on = weatherOn();
+    top.innerHTML = '';
+    top.style.display = on ? '' : 'none';
+    weatherLineW = 0;
+    if (on) {
+      var now = el('div', 'now', top), name = Data.symbol(w.code, w.isDay), icon = el('span', 'icon ' + name, now);
+      if (TWO_TONE[name]) {
+        sym(name + '_cloud', icon).className = 'sym cloud';
+        sym(name + '_accent', icon).className = 'sym accent';
+      } else {
+        sym(name, icon).className = 'sym accent';
+      }
+      el('span', 'temp', now, Data.degrees(w.temp));
+      var line = el('div', 'line', top), condition = Data.condition(w.code, w.isDay);
+      if (Data.city) el('span', 'city', line, Data.city);
+      var cond = el('span', 'cond', line, Data.city && condition ? ' · ' + condition : condition);
+      el('span', 'range', line, highLow(w, '  '));
+      // At most 760 px wide: a long condition is shortened.
+      var text = cond.textContent;
+      while (line.offsetWidth > 760 && text.length > 1) {
+        text = text.slice(0, -1);
+        cond.textContent = text.replace(/\s+$/, '') + '…';
+      }
+      weatherLineW = line.offsetWidth;
     }
+    placeQuotes();
+  }
+
+  var quotesRight = 80, weatherLineW = 0;
+
+  /** The quotes end where the shelf does, or 40 px left of the weather's second line. */
+  function placeQuotes() {
+    $('quotes').style.right = (weatherLineW ? Math.max(quotesRight, 80 + weatherLineW + 40) : quotesRight) + 'px';
+  }
+
+  /** Today's high and low ("H:24°   L:15°"), `gap` apart. */
+  function highLow(w, gap) {
+    var max = Data.degrees(w.max), min = Data.degrees(w.min);
+    return I18N.lang === 'ru' ? 'Макс. ' + max + gap + 'Мин. ' + min
+      : tr('Máx. ' + max + gap + 'Mín. ' + min, 'H:' + max + gap + 'L:' + min, 'Máx. ' + max + gap + 'Mín. ' + min);
   }
 
   function renderQuotes() {
@@ -295,7 +334,8 @@
     platter.style.display = n ? '' : 'none';
     platter.style.left = (left - pad) + 'px';
     platter.style.width = (width + 2 * pad) + 'px';
-    $('quotes').style.right = (1920 - left - width) + 'px';
+    quotesRight = 1920 - left - width;
+    placeQuotes();
     var tiles = $('tiles');
     tiles.innerHTML = '';
     for (var i = 0; i < n; i++) {
@@ -379,8 +419,7 @@
     sym(Data.symbol(w.code, w.isDay), now);
     el('span', 'temp', now, Data.degrees(w.temp));
     el('div', 'cond', card, Data.condition(w.code, w.isDay));
-    el('div', 'range', card, I18N.lang === 'ru' ? 'Макс. ' + Data.degrees(w.max) + '   Мин. ' + Data.degrees(w.min) : tr('Máx. ' + Data.degrees(w.max) + '   Mín. ' + Data.degrees(w.min), 'H:' + Data.degrees(w.max) + '   L:' + Data.degrees(w.min),
-        'Máx. ' + Data.degrees(w.max) + '   Mín. ' + Data.degrees(w.min)));
+    el('div', 'range', card, highLow(w, '   '));
     el('div', 'split', card);
     var hours = el('div', 'hours', card), width = parseFloat(card.style.width) - 30 - 422, hw = width / 6;
     for (var i = 0; i < w.hours.length && i < 6; i++) {
@@ -465,14 +504,18 @@
     var lang = Prefs.language(), unit = Prefs.temperature(), theme = Prefs.theme();
     var auto = tr('Automático', 'Automatic', 'Automático'), on = tr('Ligado', 'On', 'Activado'), off = tr('Desligado', 'Off', 'Desactivado');
     var rows = [
-      {label: tr('Idioma', 'Language', 'Idioma'), value: lang === 'ru' ? 'Русский' : lang === 'de' ? 'Deutsch' : lang === 'pt' ? 'Português' : lang === 'en' ? 'English' : lang === 'es' ? 'Español' : auto,
-        step: function (d) { cycle('language', ['auto', 'de', 'en', 'es', 'pt', 'ru'], lang, d); I18N.set(Prefs.language()); renderAll(); }},
+      {label: tr('Idioma', 'Language', 'Idioma'), value: lang === 'ru' ? 'Русский' : lang === 'de' ? 'Deutsch' : lang === 'tr' ? 'Türkçe' : lang === 'pt' ? 'Português' : lang === 'en' ? 'English' : lang === 'es' ? 'Español' : auto,
+        step: function (d) { cycle('language', ['auto', 'de', 'en', 'es', 'pt', 'ru', 'tr'], lang, d); I18N.set(Prefs.language()); renderAll(); }},
       {label: tr('Temperatura', 'Temperature', 'Temperatura'), value: unit === 'C' ? '°C' : unit === 'F' ? '°F' : auto,
         step: function (d) { cycle('temperature', ['auto', 'C', 'F'], unit, d); renderPanels(); }},
       {label: tr('Tema', 'Theme', 'Tema'), value: theme === 'light' ? tr('Claro', 'Light', 'Claro') : theme === 'dark' ? tr('Escuro', 'Dark', 'Oscuro') : auto,
         step: function (d) { cycle('theme', ['auto', 'light', 'dark'], theme, d); checkNight(); }},
+      {label: tr('Visual', 'Look', 'Apariencia'), value: Prefs.look() === 'sharp' ? tr('Nítido', 'Sharp', 'Nítido') : tr('Vidro', 'Glass', 'Cristal'),
+        step: function () { Prefs.set('look', Prefs.look() === 'sharp' ? 'glass' : 'sharp'); applyLook(); }},
+      {label: tr('Tamanho do texto', 'Text size', 'Tamaño del texto'), value: Prefs.textSize() === 'large' ? tr('Grande', 'Large', 'Grande') : tr('Normal', 'Normal', 'Normal'),
+        step: function () { Prefs.set('textSize', Prefs.textSize() === 'large' ? 'normal' : 'large'); applyLook(); renderAll(); }},
       {label: tr('Widget do clima', 'Weather widget', 'Widget del clima'), toggle: Prefs.weather(),
-        step: function () { Prefs.set('weather', !Prefs.weather()); renderPanels(); }},
+        step: function () { Prefs.set('weather', !Prefs.weather()); renderPanels(); renderWeatherTop(); }},
       {label: tr('Widget de cotações', 'Quotes widget', 'Widget de cotizaciones'), toggle: Prefs.quotes(),
         step: function () { Prefs.set('quotes', !Prefs.quotes()); Data.settingsChanged(); }}
     ];
@@ -531,7 +574,7 @@
 
   function ordinal(n) {
     if (I18N.lang === 'ru') return n + '-е';
-    if (I18N.lang === 'de') return n + '.';
+    if (I18N.lang === 'de' || I18N.lang === 'tr') return n + '.';
     if (I18N.lang !== 'en') return n + 'º';
     var s = ['th', 'st', 'nd', 'rd'], v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
@@ -610,19 +653,8 @@
     });
   }
 
-  function liveTV() {
-    for (var i = 0; i < inputs.length; i++) if (inputs[i].key === 'live') return inputs[i];
-    return null;
-  }
-
   function activate() {
     switch (st.zone) {
-      case Z.TOP:
-        if (st.top < 3) return;
-        if (st.top === 3) { var live = liveTV(); if (live) launcher(live.id, tr('TV aberta', 'Live TV', 'TV en vivo'))(); }
-        else if (st.top === 4) { st.zone = Z.SHELF; openDrawer(); st.drawer = 1 < drawerInputs ? 1 : 0; updateFocus(); }
-        else openSettings();
-        return;
       case Z.CARDS:
         var p = cards[st.card], app = p && Data.appFor(p.app);
         if (app) launcher(app.id, app.title)();
@@ -669,10 +701,10 @@
         break;
       case Z.TOP:
         if (dx) {
-          st.top = Math.max(0, Math.min(5, st.top + dx));
-          if (st.top < 3) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
+          st.top = Math.max(0, Math.min(2, st.top + dx));
+          selectTab(st.top);   // as on Apple TV: focusing a tab selects it
         } else if (dy > 0) {
-          if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < 3 ? 0 : cards.length - 1); }
+          if (cards.length) { st.zone = Z.CARDS; st.card = 0; }
           else st.zone = Z.SHELF;
         }
         break;
@@ -715,7 +747,7 @@
       if (zone !== Z.DRAWER && st.zone === Z.DRAWER && zone !== Z.SHELF) return;
       if (zone === Z.SHELF && st.zone === Z.DRAWER) closeDrawer();
       st.zone = zone;
-      if (zone === Z.TOP) { st.top = index; if (index < 3) selectTab(index); }
+      if (zone === Z.TOP) { st.top = index; selectTab(index); }
       else if (zone === Z.CARDS) st.card = index;
       else if (zone === Z.SHELF) st.shelf = index;
       else if (zone === Z.DRAWER) st.drawer = index;
@@ -739,6 +771,12 @@
   }
 
   // MARK: - Night, clock, screensaver
+
+  /** Look and Text size (Home Settings): classes on the body; home.css has the rest. */
+  function applyLook() {
+    setClass(body, 'sharp', Prefs.look() === 'sharp');
+    setClass(body, 'large', Prefs.textSize() === 'large');
+  }
 
   function checkNight() {
     setClass(body, 'night', Data.isNight(Date.now()));
@@ -859,6 +897,7 @@
     renderQuotes();
     renderCards();
     renderPanels();
+    renderWeatherTop();
     checkNight();
   });
 
@@ -874,6 +913,7 @@
   });
 
   I18N.set(Prefs.language());
+  applyLook();
   fit();
   renderTop();
   loadApps(function () {

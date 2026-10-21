@@ -9,4 +9,13 @@ final class AppLog {
     static void w(String message) {
         Log.i("FreeMyTV", message);
     }
+
+    /** More detail, only after `adb shell setprop log.tag.FreeMyTV DEBUG`. */
+    static boolean debug() {
+        return Log.isLoggable("FreeMyTV", Log.DEBUG);
+    }
+
+    static void d(String message) {
+        if (debug()) Log.d("FreeMyTV", message);
+    }
 }

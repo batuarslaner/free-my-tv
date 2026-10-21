@@ -11,7 +11,6 @@ final class Spanish {
             case "Settings": return "Ajustes";
             case "Home Settings": return "Ajustes de inicio";
             case "TV Settings": return "Ajustes del TV";
-            case "HDMI Inputs": return "Entradas HDMI";
             case "Inputs": return "Entradas";
             case "Shortcuts": return "Accesos directos";
             case "Weather": return "Clima";
@@ -84,9 +83,16 @@ final class Spanish {
             case "Language": return "Idioma";
             case "Temperature": return "Temperatura";
             case "Theme": return "Tema";
+            case "Power on": return "Al encender";
             case "Automatic": return "Automático";
             case "Light": return "Claro";
             case "Dark": return "Oscuro";
+            case "Look": return "Apariencia";
+            case "Glass": return "Cristal";
+            case "Sharp": return "Nítido";
+            case "Text size": return "Tamaño del texto";
+            case "Normal": return "Normal";
+            case "Large": return "Grande";
             case "Weather widget": return "Widget del clima";
             // What TalkBack reads on the drawer's weather card (#47)
             case ". High ": return ". Máxima ";
@@ -112,6 +118,8 @@ final class Spanish {
             case "YouTube button": return "Botón YouTube";
             case "Prime Video button": return "Botón Prime Video";
             case "TCL Channel button": return "Botón TCL Channel";
+            case "Tabii button": return "Botón Tabii";
+            case "Netflix, YouTube and Prime Video: the TV itself controls those buttons.": return "Netflix, YouTube y Prime Video: el propio TV controla esos botones.";
             case "Nothing": return "Nada";
             case "Not installed": return "No instalada";
             case ", selected": return ", seleccionado";

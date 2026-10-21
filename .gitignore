@@ -3,6 +3,9 @@ config.properties
 *.keystore
 *.idsig
 
+# The streaming apps' logos (trademarks): tools/logos.py fetches them when building
+app/assets/logos/
+
 # Build output
 out/
 *.apk

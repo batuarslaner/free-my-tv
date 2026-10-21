@@ -1,7 +1,7 @@
 /*
  * The home screen on a 1920 × 1080 stage, with the Android app's measurements (HomeView): the title and tabs at the top
- * left, icon-only glass buttons at the top right, three picks, and the glass shelf at the bottom; ↓ on the shelf opens
- * the drawer (inputs, shortcuts, weather, prices). Light by day, dark from sunset to sunrise.
+ * left, the weather at the top right, three picks, and the glass shelf at the bottom;
+ * ↓ on the shelf opens the drawer (inputs, shortcuts, weather, prices). Light by day, dark from sunset to sunrise.
  * No CSS variables, grid or backdrop-filter: older LG TVs (webOS 3 and 4) don't have them, and blur is too heavy for
  * their GPUs. Only transform and opacity animate.
  */
@@ -130,7 +130,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night .tab { color: rgba(245, 245, 247, 0.62); }
 .night .tab.focus { color: #1D1D1F; box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4); }
 
-/* Crypto quotes at the right end of the tab row: a quiet detail. */
+/* Crypto quotes on the tab row, at the right (left of the weather): a quiet detail. */
 #quotes {
   position: absolute;
   right: 80px;
@@ -146,50 +146,36 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 }
 #quotes .q { display: inline-block; margin-left: 24px; }
 #quotes svg { width: 15px; height: 15px; vertical-align: -1px; margin-right: 6px; fill: rgba(142, 142, 147, 0.7); }
-#quotes.hide { opacity: 0; }
 .night #quotes { color: rgba(245, 245, 247, 0.62); }
 .night #quotes svg { fill: rgba(245, 245, 247, 0.55); }
 
-/* Live TV, HDMI Inputs and Settings: glass circles; the focused one turns white, with its name below. */
-.round {
-  position: absolute;
-  top: 69px;
-  width: 68px;
-  height: 68px;
-  border-radius: 34px;
-  background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.5));
-  background: linear-gradient(rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.5));
-  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-  color: #1D1D1F;
-  -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.3s, background-color 0.25s;
-  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.3s, background-color 0.25s;
-}
-.round .sym { position: absolute; left: 20px; top: 20px; width: 28px; height: 28px; }
-.round.focus { background: #FFF; -webkit-transform: scale(1.1); transform: scale(1.1); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24); }
-.round .tip {
-  position: absolute;
-  top: 88px;
-  left: 50%;
-  width: 300px;
-  margin-left: -150px;
-  text-align: center;
-  font-size: 23px;
-  font-weight: 600;
-  white-space: nowrap;
-  opacity: 0;
-  -webkit-transition: opacity 0.2s;
-  transition: opacity 0.2s;
-}
-.round.last .tip { left: auto; right: -10px; margin-left: 0; text-align: right; }
-.round.focus .tip { opacity: 1; }
-.night .round {
-  background: -webkit-linear-gradient(top, rgba(40, 40, 44, 0.8), rgba(17, 17, 19, 0.62));
-  background: linear-gradient(rgba(40, 40, 44, 0.8), rgba(17, 17, 19, 0.62));
-  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.92);
-}
-.night .round.focus { background: #FFF; color: #1D1D1F; }
-.night .round.focus .tip { color: #F5F5F7; }
+/* The weather at the top right, on the background like the title (not focusable): the colored symbol and the
+   temperature on the title's baseline (130), city · condition and the high and low on the tabs' baseline (203), both
+   ending at 1840. With line-height 1.2, Inter's baseline sits 0.964 em below the box's top. */
+#wx { position: absolute; right: 80px; top: 0; text-align: right; white-space: nowrap; color: #1D1D1F; -webkit-transition: color 2s; transition: color 2s; }
+#wx .now { position: absolute; right: 0; top: 57px; font-size: 76px; font-weight: 700; line-height: 1.2; }
+#wx .icon { position: relative; display: inline-block; vertical-align: top; width: 55px; height: 55px; margin: 18px 16px 0 0; }
+#wx .icon .sym { position: absolute; left: 0; top: 0; width: 55px; height: 55px; -webkit-mask-position: right center; }
+#wx .line { position: absolute; right: 0; top: 176px; font-size: 28px; line-height: 1.2; }
+#wx .city { font-weight: 700; }
+#wx .cond { font-weight: 500; white-space: pre; }
+#wx .range { margin-left: 22px; font-size: 26px; font-weight: 500; color: #6E6E73; white-space: pre; font-feature-settings: 'tnum'; }
+.night #wx { color: #F5F5F7; }
+.night #wx .range { color: rgba(245, 245, 247, 0.62); }
+/* The symbol in color, like Apple's Weather: clouds gray, the sun amber, the moon pale, rain and snow blue, lightning
+   yellow; lighter tones at night. */
+#wx .cloud, #wx .accent { background-color: #8C97A8; }
+#wx .sunny .accent, #wx .partly_cloudy_day .accent { background-color: #F5A300; }
+#wx .clear_night .accent, #wx .partly_cloudy_night .accent { background-color: #6E73C8; }
+#wx .rainy .accent { background-color: #2F8CFF; }
+#wx .snowflake .accent { background-color: #4FA8E8; }
+#wx .thunderstorm .accent { background-color: #F5B800; }
+.night #wx .cloud, .night #wx .accent { background-color: #DDE3EC; }
+.night #wx .sunny .accent, .night #wx .partly_cloudy_day .accent { background-color: #FFCC33; }
+.night #wx .clear_night .accent, .night #wx .partly_cloudy_night .accent { background-color: #DCDDF5; }
+.night #wx .rainy .accent { background-color: #5AB0FF; }
+.night #wx .snowflake .accent { background-color: #A9DBFF; }
+.night #wx .thunderstorm .accent { background-color: #FFD43B; }
 
 /* MARK: - Picks: a wide card and two tall ones; focused, a card grows 5%, rises and its edge lights up. */
 
@@ -524,3 +510,56 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* The Magic Remote's pointer: no text selection, no outlines. */
 * { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+
+/* MARK: - Look: Sharp (Home Settings), the body's "sharp" class: flat panels with a 1 px hairline in place of the
+   glass, tighter shadows and more contrast in the text, as on Android. */
+.sharp #platter, .sharp .glass { background: rgba(242, 242, 245, 0.92); box-shadow: 0 9px 12px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
+.sharp .glass { box-shadow: 0 5px 12px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
+.sharp.night #platter, .sharp.night .glass { background: rgba(28, 28, 30, 0.92); box-shadow: 0 9px 12px rgba(0, 0, 0, 0.32), inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+.sharp .key.focus, .sharp.night .key.focus { background: #F5F5F7; box-shadow: 0 6px 12px rgba(0, 0, 0, 0.42); }
+.sharp .tile { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14); }
+.sharp .tile.focus { box-shadow: 0 9px 14px rgba(0, 0, 0, 0.34); }
+.sharp.night .tile { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3); }
+.sharp.night .tile.focus { box-shadow: 0 9px 14px rgba(0, 0, 0, 0.6); }
+.sharp .tile::after { display: none; }
+.sharp .tab.focus { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22); }
+.sharp.night .tab.focus { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); }
+.sharp .card .img { box-shadow: 0 5px 14px rgba(0, 0, 0, 0.14); }
+.sharp .card.focus .img { box-shadow: 0 12px 16px rgba(0, 0, 0, 0.34); }
+.sharp.night .card .img { box-shadow: 0 5px 14px rgba(0, 0, 0, 0.32); }
+.sharp .card .img::after { background: none; box-shadow: inset 0 0 0 2px #FFF; }
+.sharp #toast { background: rgba(28, 28, 30, 0.95); box-shadow: 0 8px 16px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+.sharp #title, .sharp .tab.on, .sharp .tab.focus, .sharp #wx, .sharp .card .name, .sharp .panel, .sharp .key { color: #111; }
+.sharp .tab, .sharp #wx .range, .sharp .card .meta, .sharp .row-title, .sharp .panel .head, .sharp #weather .range,
+.sharp #weather .hour .t, .sharp #weather .sun { color: #505055; }
+.sharp #quotes, .sharp .panel .side, .sharp .key.off { color: #6E6E73; }
+.sharp.night #title, .sharp.night .tab.on, .sharp.night #wx, .sharp.night .card .name, .sharp.night .panel, .sharp.night .key { color: #FFF; }
+.sharp.night .tab.focus, .sharp.night .key.focus { color: #111; }
+.sharp.night .tab, .sharp.night #wx .range, .sharp.night #quotes, .sharp.night .card .meta, .sharp.night .row-title, .sharp.night .panel .head,
+.sharp.night #weather .range, .sharp.night #weather .hour .t, .sharp.night #weather .sun { color: rgba(255, 255, 255, 0.78); }
+.sharp.night .panel .side, .sharp.night .key.off { color: rgba(255, 255, 255, 0.6); }
+
+/* MARK: - Text size: Large (Home Settings), the body's "large" class: the smaller text 13% bigger and one weight
+   heavier; the title, the clock and the temperatures stay. */
+.large .tab { font-size: 34px; font-weight: 600; }
+.large .tab.on { font-weight: 700; }
+.large #quotes { font-size: 24px; }
+.large #wx .line { top: 172px; font-size: 32px; }
+.large #wx .cond { font-weight: 600; }
+.large #wx .range { font-size: 29px; font-weight: 600; }
+.large .card .name { font-size: 35px; font-weight: 700; }
+.large .card .meta { top: 510px; font-size: 28px; font-weight: 600; }
+.large .row-title { font-size: 28px; font-weight: 700; }
+.large .key .label { font-size: 26px; font-weight: 600; }
+.large .panel .head { font-size: 28px; font-weight: 700; }
+.large .panel .side { font-size: 24px; font-weight: 600; }
+.large #weather .cond { font-size: 33px; font-weight: 600; }
+.large #weather .range, .large #weather .sun { font-size: 26px; font-weight: 600; }
+.large #weather .hour .t { font-size: 25px; font-weight: 600; }
+.large #weather .hour .d { font-size: 29px; font-weight: 600; }
+.large #prices .coin { font-size: 33px; font-weight: 600; }
+.large #prices .coin .p { font-size: 29px; }
+.large #prices .coin .c { font-size: 24px; font-weight: 700; }
+.large .cell .label { font-size: 27px; font-weight: 600; }
+.large #toast { font-size: 29px; font-weight: 600; }
+.large .box .hint { font-size: 25px; font-weight: 600; }

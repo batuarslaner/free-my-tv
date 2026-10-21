@@ -13,7 +13,8 @@ import android.os.PersistableBundle;
  * the switch finishes, even with the screen showing something else.
  */
 public class ModeJob extends JobService {
-    static final String APPLY = "apply", VERIFY = "verify", REVERT = "revert", MEMORY = "memory", REMOTE = "remote";
+    static final String APPLY = "apply", VERIFY = "verify", REVERT = "revert", MEMORY = "memory", REMOTE = "remote",
+            NOTICE = "notice";
 
     @Override public boolean onStartJob(JobParameters params) {
         PersistableBundle extras = params.getExtras();
@@ -28,6 +29,7 @@ public class ModeJob extends JobService {
                     case REVERT: HomeMode.revertHomeNow(app); break;
                     case MEMORY: HomeMode.measureMemoryNow(app, mode); break;
                     case REMOTE: HomeMode.ensureRemoteServiceNow(app); break;
+                    case NOTICE: HomeMode.notice(app, extras.getString("text", "")); break;
                     default: break;
                 }
             } catch (Throwable t) {
@@ -42,11 +44,21 @@ public class ModeJob extends JobService {
         return false;
     }
 
+    /** A notice from another process (:airplay): only the main process writes the state file. */
+    static void notice(Context c, String text) {
+        PersistableBundle extras = new PersistableBundle();
+        extras.putString("text", text);
+        schedule(c, NOTICE, null, 0, extras);
+    }
+
     /** Schedules a job (one pending per action: a new request replaces the old one). */
     static void schedule(Context c, String action, String mode, long delayMs) {
+        schedule(c, action, mode, delayMs, new PersistableBundle());
+    }
+
+    private static void schedule(Context c, String action, String mode, long delayMs, PersistableBundle extras) {
         JobScheduler scheduler = c.getSystemService(JobScheduler.class);
         if (scheduler == null) return;
-        PersistableBundle extras = new PersistableBundle();
         extras.putString("action", action);
         extras.putString("mode", mode == null ? "" : mode);
         JobInfo.Builder job = new JobInfo.Builder(1000 + Math.abs(action.hashCode() % 1000),

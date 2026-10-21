@@ -6,12 +6,23 @@ final class German {
 
     static String text(String english) {
         switch (english) {
+            // AirPlay
+            case "AirPlay name": return "AirPlay-Name";
+            case "AirPlay code": return "AirPlay-Code";
+            case "First time": return "Beim ersten Mal";
+            case "Always": return "Immer";
+            case "Needs the FairPlay plugin": return "Braucht das FairPlay-Plugin";
+            case "Paused after errors": return "Nach Fehlern pausiert";
+            case "Empty: the TV's name": return "Leer: der Name des Fernsehers";
+            case "Save": return "Speichern";
+            case "Type this code on your iPhone or iPad": return "Gib diesen Code auf dem iPhone oder iPad ein";
+            case "Press Back again to stop AirPlay": return "Zum Beenden von AirPlay noch einmal Zurück drücken";
+            case "AirPlay crashed 3 times in a row and is paused; turn Free My TV on again to retry.": return "AirPlay ist dreimal hintereinander abgestürzt und pausiert; schalte Free My TV erneut ein, um es noch einmal zu versuchen.";
             case "Live TV": return "Live-TV";
             case "All Apps": return "Alle Apps";
             case "Settings": return "Einstellungen";
             case "Home Settings": return "Start-Einstellungen";
             case "TV Settings": return "TV-Einstellungen";
-            case "HDMI Inputs": return "HDMI-Eingänge";
             case "Inputs": return "Eingänge";
             case "Shortcuts": return "Verknüpfungen";
             case "Weather": return "Wetter";
@@ -92,9 +103,16 @@ final class German {
             case "Language": return "Sprache";
             case "Temperature": return "Temperatur";
             case "Theme": return "Design";
+            case "Power on": return "Beim Einschalten";
             case "Automatic": return "Automatisch";
             case "Light": return "Hell";
             case "Dark": return "Dunkel";
+            case "Look": return "Darstellung";
+            case "Glass": return "Glas";
+            case "Sharp": return "Scharf";
+            case "Text size": return "Textgröße";
+            case "Normal": return "Normal";
+            case "Large": return "Groß";
             case "Weather widget": return "Wetter-Widget";
             // What TalkBack reads on the drawer's weather card (#47)
             case ". High ": return ". Höchstwert ";
@@ -120,6 +138,8 @@ final class German {
             case "YouTube button": return "YouTube-Taste";
             case "Prime Video button": return "Prime-Video-Taste";
             case "TCL Channel button": return "TCL-Channel-Taste";
+            case "Tabii button": return "Tabii-Taste";
+            case "Netflix, YouTube and Prime Video: the TV itself controls those buttons.": return "Netflix, YouTube und Prime Video: Diese Tasten steuert der Fernseher selbst.";
             case "Nothing": return "Nichts";
             case "Not installed": return "Nicht installiert";
             case ", selected": return ", ausgewählt";

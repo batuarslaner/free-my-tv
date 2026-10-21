@@ -28,7 +28,9 @@ import java.util.regex.Pattern;
  *
  * It all goes through the TV's own ADB (Adb, 127.0.0.1:5555), which you allow once on the TV. The switches run as
  * background jobs (ModeJob) in the main process; the settings screen (the :home process) asks for them and follows the
- * state file. Only the TV itself asks for switches: nothing here listens to the network.
+ * state file. Only the TV itself asks for switches: nothing here listens to the network. (AirPlay does, in Free My
+ * TV mode, from its own :airplay process; it never switches anything or runs shell commands. Here it is only started
+ * and stopped: AirPlay.resume and AirPlay.stop.)
  */
 final class HomeMode {
     private HomeMode() {}
@@ -72,6 +74,9 @@ final class HomeMode {
         // Xiaomi
         "com.miui.tv.analytics", "com.xiaomi.statistic",                              // telemetry
         "com.mitv.tvhome.mitvplus", "com.xm.webcontent",                              // Mi TV+ promo channels, promo web content
+        // KTC (NextStar; MediaTek)
+        "tv.anoki.acr.controller",                                                    // Anoki ACR: watches what's on screen
+        "com.mediatek.tv.retaildemo", "com.electronic.manual",                        // store demo, manual
     };
 
     /** The voice assistant, only with disable_assistant=true in config.properties (the mic button stops working). */
@@ -106,7 +111,13 @@ final class HomeMode {
         "mitv.service", "com.mi.bluetooth", "com.mitv.livetv.ci_mediatek", "com.xiaomi.tvqs.overseas",
         "com.mitv.tvlock", "com.xiaomi.mitv.updateservice", "com.xiaomi.android.tvsetup.partnercustomizer",
         "com.mitv.overseaservice", "com.xiaomi.mitv.tvmanager", "com.xiaomi.wfdsinkhelperservice",
-        "com.mitv.milinkservice", "com.xiaomi.mitv.smartshare", "android.autoinstalls.config.xiaomi.amelie"));
+        "com.mitv.milinkservice", "com.xiaomi.mitv.smartshare", "android.autoinstalls.config.xiaomi.amelie",
+        // KTC (NextStar; MediaTek): live TV and tuners, setup, settings, updates, casting, remote pairing, factory menus
+        "com.mediatek.tv.oneworld.tvcenter", "com.mediatek.tis", "com.mediatek.tv.agent",
+        "com.mediatek.dtv.tvinput.dvbtuner", "com.mediatek.tv.oneworld.wizardkt", "com.mediatek.tv.settings",
+        "com.mediatek.tv.systemupdater", "com.mediatek.extservice", "com.mediatek.dialservice", "com.mediatek.miracast",
+        "com.mediatek.tv.launcher.partner", "com.google.android.tv.googletvremotepairer", "com.ktc.serialport",
+        "com.ktc.tv.factory", "ktc.factorymenu.ui"));
 
     /** One switch at a time (jobs can overlap: a boot check and a button press). */
     private static final Object RUN = new Object();
@@ -270,13 +281,14 @@ final class HomeMode {
             }
             notice(c, Ui.tr("Free My TV ligado: Início e tela de descanso novos, " + disabled.size() + " apps desligados.",
                     "Free My TV is on: new home screen and screensaver, " + disabled.size() + " apps turned off."));
+            AirPlay.resume(c);   // never throws
             busy(c, Ui.tr("Medindo o Free My TV…", "Measuring Free My TV…"));
             measureHomeTime(c, adb, FREE);
             done(c, null);
             adb.shell("am start -a android.intent.action.MAIN -c android.intent.category.HOME");
             ModeJob.schedule(c, ModeJob.MEMORY, FREE, 120_000);
         } catch (Exception e) {
-            done(c, Ui.tr("Não deu para ligar o Free My TV: ", "Couldn't turn on Free My TV: ") + (Ui.ru ? Russian.text(e.getMessage() == null ? "" : e.getMessage()) : e.getMessage()));
+            done(c, Ui.tr("Não deu para ligar o Free My TV: ", "Couldn't turn on Free My TV: ") + (Ui.ru ? Russian.text(e.getMessage() == null ? "" : e.getMessage()) : Ui.tr ? Turkish.text(e.getMessage() == null ? "" : e.getMessage()) : e.getMessage()));
         }
     }
 
@@ -312,6 +324,7 @@ final class HomeMode {
             s.put("mode", ORIGINAL).put("since", System.currentTimeMillis()).put("homeReverted", false)
                     .put("disabled", new JSONArray(failed));
             save(c, s);
+            AirPlay.stop(c);   // after the mode is saved: nothing starts it again
             if (failed.isEmpty() && homeOk) {
                 notice(c, Ui.tr("Modo original: Início, tela de descanso e apps de fábrica de volta.",
                         "Original mode: the factory home screen, screensaver and apps are back."));
@@ -327,7 +340,7 @@ final class HomeMode {
             adb.shell("am start -a android.intent.action.MAIN -c android.intent.category.HOME");
             ModeJob.schedule(c, ModeJob.MEMORY, ORIGINAL, 120_000);
         } catch (Exception e) {
-            done(c, Ui.tr("Não deu para voltar ao original: ", "Couldn't go back to the original: ") + (Ui.ru ? Russian.text(e.getMessage() == null ? "" : e.getMessage()) : e.getMessage()));
+            done(c, Ui.tr("Não deu para voltar ao original: ", "Couldn't go back to the original: ") + (Ui.ru ? Russian.text(e.getMessage() == null ? "" : e.getMessage()) : Ui.tr ? Turkish.text(e.getMessage() == null ? "" : e.getMessage()) : e.getMessage()));
         }
     }
 
@@ -429,7 +442,7 @@ final class HomeMode {
                 latest.put("disabled", new JSONArray(sorted(disabled)));
                 save(app, latest);
             } catch (Exception e) {
-                notice(app, Ui.tr("Não consegui conferir o Free My TV: ", "Couldn't check Free My TV: ") + (Ui.ru ? Russian.text(e.getMessage() == null ? "" : e.getMessage()) : e.getMessage()));
+                notice(app, Ui.tr("Não consegui conferir o Free My TV: ", "Couldn't check Free My TV: ") + (Ui.ru ? Russian.text(e.getMessage() == null ? "" : e.getMessage()) : Ui.tr ? Turkish.text(e.getMessage() == null ? "" : e.getMessage()) : e.getMessage()));
                 return;
             }
             if (!fixed.isEmpty()) {

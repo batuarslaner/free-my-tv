@@ -13,12 +13,23 @@ final class Russian {
 
     static String text(String english) {
         switch (english) {
+            // AirPlay
+            case "AirPlay name": return "Имя AirPlay";
+            case "AirPlay code": return "Код AirPlay";
+            case "First time": return "В первый раз";
+            case "Always": return "Всегда";
+            case "Needs the FairPlay plugin": return "Нужен плагин FairPlay";
+            case "Paused after errors": return "Приостановлен после ошибок";
+            case "Empty: the TV's name": return "Пусто: имя телевизора";
+            case "Save": return "Сохранить";
+            case "Type this code on your iPhone or iPad": return "Введите этот код на iPhone или iPad";
+            case "Press Back again to stop AirPlay": return "Нажмите «Назад» ещё раз, чтобы остановить AirPlay";
+            case "AirPlay crashed 3 times in a row and is paused; turn Free My TV on again to retry.": return "AirPlay трижды подряд завершился с ошибкой и приостановлен; снова включите Free My TV, чтобы попробовать ещё раз.";
             case "Live TV": return "Телеканалы";
             case "All Apps": return "Приложения";
             case "Settings": return "Настройки";
             case "Home Settings": return "Главный экран";
             case "TV Settings": return "Настройки ТВ";
-            case "HDMI Inputs": return "Входы HDMI";
             case "Inputs": return "Входы";
             case "Shortcuts": return "Ярлыки";
             case "Weather": return "Погода";
@@ -91,9 +102,16 @@ final class Russian {
             case "Language": return "Язык";
             case "Temperature": return "Температура";
             case "Theme": return "Тема";
+            case "Power on": return "При включении";
             case "Automatic": return "Автоматически";
             case "Light": return "Светлая";
             case "Dark": return "Тёмная";
+            case "Look": return "Вид";
+            case "Glass": return "Стекло";
+            case "Sharp": return "Чёткий";
+            case "Text size": return "Размер текста";
+            case "Normal": return "Обычный";
+            case "Large": return "Крупный";
             case "Weather widget": return "Виджет погоды";
             // What TalkBack reads on the drawer's weather card (#47)
             case ". High ": return ". Максимум ";
@@ -119,6 +137,8 @@ final class Russian {
             case "YouTube button": return "Кнопка YouTube";
             case "Prime Video button": return "Кнопка Prime Video";
             case "TCL Channel button": return "Кнопка TCL Channel";
+            case "Tabii button": return "Кнопка Tabii";
+            case "Netflix, YouTube and Prime Video: the TV itself controls those buttons.": return "Netflix, YouTube и Prime Video: этими кнопками управляет сам телевизор.";
             case "Nothing": return "Ничего";
             case "Not installed": return "Не установлено";
             case ", selected": return ", выбрано";

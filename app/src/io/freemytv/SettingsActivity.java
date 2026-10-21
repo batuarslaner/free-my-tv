@@ -135,7 +135,10 @@ public class SettingsActivity extends Activity {
         private String cityStatus = "";
         private final RectF tmp = new RectF(), rowRect = new RectF(), focusBox = new RectF();
         private JSONObject state = new JSONObject(), recs = new JSONObject();
-        private boolean hasKey;
+        private boolean hasKey, liveTv;   // liveTv: this TV has live TV (the Power on row)
+        /** AirPlay, read when Home Settings opens and after each change (files, not on every frame). */
+        private boolean airplayPlugin, airplayOn, airplayPaused;
+        private String airplayName = "", airplayCode = io.freemytv.airplay.Advert.CODE_OFF;
         private int screen = MAIN, focus;
         private boolean running, okDown, backDown, wasBusy;
         private StaticLayout errorLayout;   // the last error, wrapped (rebuilt only when it changes)
@@ -223,7 +226,8 @@ public class SettingsActivity extends Activity {
                 case REMOTE_KEYS: {
                     boolean keys = screen == REMOTE_KEYS;
                     String[] labels = keys ? keyLabels() : settingLabels(), values = keys ? keyValues() : settingValues();
-                    return row < labels.length ? labels[row] + ", " + values[row] : "";
+                    int at = keys ? row : pickScroll + row;
+                    return at < labels.length ? labels[at] + ", " + values[at] : "";
                 }
                 case PICKER: {
                     int at = pickScroll + row;
@@ -334,7 +338,7 @@ public class SettingsActivity extends Activity {
             switch (screen) {
                 case MAIN: return 6;
                 case HOME_CHOICE: return 2;
-                case HOME_SETTINGS: return settingLabels().length;
+                case HOME_SETTINGS: return Math.min(SETTINGS_VISIBLE, settingRows().size());
                 case PICKER: return Math.min(PICK_VISIBLE, pickLabels.size());
                 case SHELF_EDIT: return Math.min(PICK_VISIBLE, shelfRows.size());
                 default: return Prefs.KEYS.length;
@@ -496,7 +500,7 @@ public class SettingsActivity extends Activity {
             for (int i = 0; notices != null && i < notices.length() && shown < 2; i++) {
                 JSONObject o = notices.optJSONObject(i);
                 if (o == null) continue;
-                String line = ago(o.optLong("at")) + " · " + (Ui.ru ? Russian.text(o.optString("text")) : o.optString("text"));
+                String line = ago(o.optLong("at")) + " · " + (Ui.ru ? Russian.text(o.optString("text")) : Ui.tr ? Turkish.text(o.optString("text")) : o.optString("text"));
                 c.drawText(TextUtils.ellipsize(line, notice, 790 * k, TextUtils.TruncateAt.END).toString(), x, y + (42 + 38 * shown) * k, notice);
                 shown++;
             }
@@ -523,10 +527,16 @@ public class SettingsActivity extends Activity {
                     Symbols.draw(getContext(), c, "check", rowRect.right - 30 * k - cw / 2, rowRect.centerY(), 26 * k, blend(0xFFFFFFFF, INK, f));
                 }
             }
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
+            Paint hint = hint();
             c.drawText(Ui.tr("A troca leva uns segundos e a tela pisca nas medições.",
                     "Switching takes a few seconds; the screen blinks while it measures."), LIST_X * k + 30 * k,
                     (LIST_TOP + 20 + 2 * (CHOICE_H + ROW_GAP) + 40) * k, hint);
+        }
+
+        /** The hint lines under the lists (Text size: Large makes them bigger and a little bolder). */
+        private Paint hint() {
+            boolean large = Prefs.textSize().equals("large");
+            return Ui.text(large ? Ui.medium : Ui.regular, 23 * k * (large ? 1.13f : 1), 0x8CFFFFFF);
         }
 
         private static int blend(int a, int b, float f) {
@@ -602,8 +612,8 @@ public class SettingsActivity extends Activity {
                     } else {
                         if (backDown && !e.isCanceled()) {
                             if (screen == PICKER && pickFor == PICK_CITY) {
-                                focus = CITY_ROW;
                                 screen = HOME_SETTINGS;
+                                focusSetting(S_CITY);
                             } else if (screen == PICKER) {
                                 focus = pickFor - 1;
                                 screen = REMOTE_KEYS;
@@ -624,44 +634,121 @@ public class SettingsActivity extends Activity {
 
         // MARK: - Home Settings and Remote Buttons
 
-        private static final String[] LANGUAGES = {"auto", "pt", "en", "es", "de", "ru"}, UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"};
-        /** Home Settings: language, temperature, theme, weather, quotes, then one row per coin. */
-        private static final int CITY_ROW = 4, COIN_ROWS = 6;
+        private static final String[] LANGUAGES = {"auto", "pt", "en", "es", "de", "ru", "tr"}, UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"};
+        /** Home Settings rows, by what they change (the list depends on the TV: the dollar, Power on). */
+        private static final int S_LANGUAGE = 0, S_TEMPERATURE = 1, S_THEME = 2, S_LOOK = 3, S_TEXT_SIZE = 4, S_WEATHER = 5,
+                S_CITY = 6, S_QUOTES = 7, S_POWER = 8, S_AIRPLAY = 9, S_AIRPLAY_NAME = 10, S_AIRPLAY_CODE = 11,
+                S_COIN = 100;   // S_COIN + the coin's index
+        /** Home Settings rows on screen at once; more scroll. */
+        private static final int SETTINGS_VISIBLE = 10;
 
         private boolean dollar() {
             return "BRL".equalsIgnoreCase(Config.CURRENCY.trim());
         }
 
+        /**
+         * Home Settings, in order: language, temperature, theme, look, text size, weather, city, quotes, one row per
+         * coin, Power on (with live TV), then AirPlay (its name and code with the FairPlay plugin).
+         */
+        private List<Integer> settingRows() {
+            List<Integer> rows = new ArrayList<>(java.util.Arrays.asList(S_LANGUAGE, S_TEMPERATURE, S_THEME, S_LOOK,
+                    S_TEXT_SIZE, S_WEATHER, S_CITY, S_QUOTES, S_COIN, S_COIN + 1, S_COIN + 2));
+            if (dollar()) rows.add(S_COIN + 3);
+            if (liveTv) rows.add(S_POWER);
+            rows.add(S_AIRPLAY);
+            if (airplayPlugin) {
+                rows.add(S_AIRPLAY_NAME);
+                rows.add(S_AIRPLAY_CODE);
+            }
+            return rows;
+        }
+
+        private void readAirPlay() {
+            Context c = getContext();
+            airplayPlugin = AirPlay.pluginInstalled(c);
+            airplayOn = AirPlay.enabled(c);
+            airplayPaused = AirPlay.paused(c);
+            airplayName = AirPlay.name(c);
+            airplayCode = AirPlay.code(c);
+        }
+
+        /** The id of the Home Settings row at `row` on screen (-1 past the end). */
+        private int settingRow(int row) {
+            List<Integer> rows = settingRows();
+            int at = pickScroll + row;
+            return at < rows.size() ? rows.get(at) : -1;
+        }
+
+        /** Focuses a Home Settings row, scrolled into view. */
+        private void focusSetting(int id) {
+            List<Integer> rows = settingRows();
+            int at = Math.max(0, rows.indexOf(id)), visible = Math.min(SETTINGS_VISIBLE, rows.size());
+            pickScroll = Math.max(0, Math.min(at - visible / 2, rows.size() - visible));
+            focus = at - pickScroll;
+        }
+
         private String[] settingLabels() {
-            List<String> l = new ArrayList<>();
-            l.add(Ui.tr("Idioma", "Language"));
-            l.add(Ui.tr("Temperatura", "Temperature"));
-            l.add(Ui.tr("Tema", "Theme"));
-            l.add(Ui.tr("Widget do clima", "Weather widget"));
-            l.add(Ui.tr("Cidade", "City"));
-            l.add(Ui.tr("Widget de cotações", "Quotes widget"));
-            l.add("Bitcoin");
-            l.add("Ethereum");
-            l.add("Solana");
-            if (dollar()) l.add(Ui.tr("Dólar", "Dollar"));
-            return l.toArray(new String[0]);
+            List<Integer> rows = settingRows();
+            String[] l = new String[rows.size()];
+            String[] coins = {"Bitcoin", "Ethereum", "Solana", Ui.tr("Dólar", "Dollar")};
+            for (int i = 0; i < l.length; i++) {
+                int id = rows.get(i);
+                l[i] = id == S_LANGUAGE ? Ui.tr("Idioma", "Language") : id == S_TEMPERATURE ? Ui.tr("Temperatura", "Temperature")
+                        : id == S_THEME ? Ui.tr("Tema", "Theme") : id == S_LOOK ? Ui.tr("Visual", "Look")
+                        : id == S_TEXT_SIZE ? Ui.tr("Tamanho do texto", "Text size")
+                        : id == S_WEATHER ? Ui.tr("Widget do clima", "Weather widget") : id == S_CITY ? Ui.tr("Cidade", "City")
+                        : id == S_QUOTES ? Ui.tr("Widget de cotações", "Quotes widget") : id == S_POWER ? Ui.tr("Ao ligar", "Power on")
+                        : id == S_AIRPLAY ? "AirPlay"
+                        : id == S_AIRPLAY_NAME ? Ui.tr("Nome do AirPlay", "AirPlay name", "Nombre de AirPlay")
+                        : id == S_AIRPLAY_CODE ? Ui.tr("Código do AirPlay", "AirPlay code", "Código de AirPlay")
+                        : coins[id - S_COIN];
+            }
+            return l;
         }
 
         private String[] settingValues() {
-            String[] labels = settingLabels();
-            String[] v = new String[labels.length];
-            String lang = Prefs.language();
-            v[0] = lang.equals("pt") ? "Português" : lang.equals("en") ? "English" : lang.equals("es") ? "Español"
-                    : lang.equals("de") ? "Deutsch" : lang.equals("ru") ? "Русский" : Ui.tr("Automático", "Automatic");
-            String unit = Prefs.temperature();
-            v[1] = unit.equals("C") ? "°C" : unit.equals("F") ? "°F" : Ui.tr("Automática", "Automatic");
-            String theme = Prefs.theme();
-            v[2] = theme.equals("light") ? Ui.tr("Claro", "Light") : theme.equals("dark") ? Ui.tr("Escuro", "Dark") : Ui.tr("Automático", "Automatic");
-            v[3] = onOff(Prefs.weather());
-            v[CITY_ROW] = !cityStatus.isEmpty() ? cityStatus : Prefs.city().isEmpty() ? "—" : Prefs.city();
-            v[5] = onOff(Prefs.quotes());
-            // No quotes widget, nowhere to show prices: the coins read as off (and stay locked) until it is back on.
-            for (int i = COIN_ROWS; i < v.length; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
+            List<Integer> rows = settingRows();
+            String[] v = new String[rows.size()];
+            for (int i = 0; i < v.length; i++) {
+                int id = rows.get(i);
+                switch (id) {
+                    case S_LANGUAGE: {
+                        String lang = Prefs.language();
+                        v[i] = lang.equals("pt") ? "Português" : lang.equals("en") ? "English" : lang.equals("es") ? "Español"
+                                : lang.equals("de") ? "Deutsch" : lang.equals("ru") ? "Русский" : lang.equals("tr") ? "Türkçe" : Ui.tr("Automático", "Automatic");
+                        break;
+                    }
+                    case S_TEMPERATURE: {
+                        String unit = Prefs.temperature();
+                        v[i] = unit.equals("C") ? "°C" : unit.equals("F") ? "°F" : Ui.tr("Automática", "Automatic");
+                        break;
+                    }
+                    case S_THEME: {
+                        String theme = Prefs.theme();
+                        v[i] = theme.equals("light") ? Ui.tr("Claro", "Light") : theme.equals("dark") ? Ui.tr("Escuro", "Dark") : Ui.tr("Automático", "Automatic");
+                        break;
+                    }
+                    case S_LOOK: v[i] = Prefs.look().equals("sharp") ? Ui.tr("Nítido", "Sharp") : Ui.tr("Vidro", "Glass"); break;
+                    case S_TEXT_SIZE: v[i] = Prefs.textSize().equals("large") ? Ui.tr("Grande", "Large") : Ui.tr("Normal", "Normal"); break;
+                    case S_WEATHER: v[i] = onOff(Prefs.weather()); break;
+                    case S_CITY: v[i] = !cityStatus.isEmpty() ? cityStatus : Prefs.city().isEmpty() ? "—" : Prefs.city(); break;
+                    case S_QUOTES: v[i] = onOff(Prefs.quotes()); break;
+                    case S_POWER: v[i] = Prefs.powerOn().equals("live") ? Ui.tr("TV ao Vivo", "Live TV") : Ui.tr("Tela Inicial", "Home Screen"); break;
+                    case S_AIRPLAY:
+                        v[i] = !airplayPlugin ? Ui.tr("Precisa do plugin FairPlay", "Needs the FairPlay plugin", "Necesita el complemento FairPlay")
+                                : airplayOn && airplayPaused ? Ui.tr("Pausado após erros", "Paused after errors", "En pausa tras errores")
+                                : onOff(airplayOn);
+                        break;
+                    case S_AIRPLAY_NAME: v[i] = airplayName; break;
+                    case S_AIRPLAY_CODE:
+                        v[i] = io.freemytv.airplay.Advert.CODE_FIRST.equals(airplayCode) ? Ui.tr("Na primeira vez", "First time", "La primera vez")
+                                : io.freemytv.airplay.Advert.CODE_ALWAYS.equals(airplayCode) ? Ui.tr("Sempre", "Always", "Siempre")
+                                : onOff(false);
+                        break;
+                    // No quotes widget, nowhere to show prices: the coins read as off (and stay locked) until it is back on.
+                    default: v[i] = onOff(Prefs.quotes() && Prefs.coin(id - S_COIN)); break;
+                }
+            }
             return v;
         }
 
@@ -671,6 +758,7 @@ public class SettingsActivity extends Activity {
 
         private String[] keyLabels() {
             if (RemoteKeys.VESTEL) return new String[] {Ui.tr("Botão Netflix", "Netflix button")};
+            if (RemoteKeys.KTC) return new String[] {Ui.tr("Botão Tabii", "Tabii button")};
             return new String[] {Ui.tr("Botão Netflix", "Netflix button"), Ui.tr("Botão YouTube", "YouTube button"),
                     Ui.tr("Botão Prime Video", "Prime Video button"), Ui.tr("Botão TCL Channel", "TCL Channel button")};
         }
@@ -700,6 +788,10 @@ public class SettingsActivity extends Activity {
             appLabels.clear();
             appPkgs.add("");
             appLabels.add(Ui.tr("Nada", "Nothing"));
+            if (HomeApps.liveTv(getContext()) != null) {
+                appPkgs.add(HomeApps.LIVE);
+                appLabels.add(Ui.tr("TV ao Vivo", "Live TV"));
+            }
             for (String[] f : found) {
                 appPkgs.add(f[0]);
                 appLabels.add(f[1]);
@@ -715,28 +807,56 @@ public class SettingsActivity extends Activity {
                 Prefs.setKeyApp(Prefs.KEYS[focus], appPkgs.get(next));
                 return;
             }
-            switch (focus) {
-                case 0: {
+            int id = settingRow(focus);
+            switch (id) {
+                case S_POWER:
+                    Prefs.setPowerOn(Prefs.powerOn().equals("live") ? "home" : "live");
+                    return;
+                case S_LANGUAGE: {
                     int at = java.util.Arrays.asList(LANGUAGES).indexOf(Prefs.language());
                     Prefs.setLanguage(LANGUAGES[(at + dir + LANGUAGES.length) % LANGUAGES.length]);
                     break;
                 }
-                case 1: {
+                case S_TEMPERATURE: {
                     int at = java.util.Arrays.asList(UNITS).indexOf(Prefs.temperature());
                     Prefs.setTemperature(UNITS[(at + dir + UNITS.length) % UNITS.length]);
                     break;
                 }
-                case 2: {
+                case S_THEME: {
                     int at = java.util.Arrays.asList(THEMES).indexOf(Prefs.theme());
                     Prefs.setTheme(THEMES[(at + dir + THEMES.length) % THEMES.length]);
                     break;
                 }
-                case 3: Prefs.setWeather(!Prefs.weather()); break;
-                case CITY_ROW: return;
-                case 5: Prefs.setQuotes(!Prefs.quotes()); break;
+                // Two values each, so either arrow switches; the home screen draws itself again with them (Prefs.version).
+                case S_LOOK: Prefs.setLook(Prefs.look().equals("sharp") ? "glass" : "sharp"); return;
+                case S_TEXT_SIZE: Prefs.setTextSize(Prefs.textSize().equals("large") ? "normal" : "large"); return;
+                case S_WEATHER: Prefs.setWeather(!Prefs.weather()); break;
+                case S_CITY: return;
+                case S_AIRPLAY: {
+                    if (!airplayPlugin) return;
+                    Context c = getContext();
+                    // On again after a crash pause: the pause ends (as when Free My TV mode is turned on again).
+                    boolean on = !airplayOn || airplayPaused;
+                    AirPlay.putSetting(c, "enabled", String.valueOf(on));
+                    if (on) AirPlay.resume(c);
+                    else AirPlay.stop(c);
+                    readAirPlay();
+                    return;
+                }
+                case S_AIRPLAY_NAME: return;
+                case S_AIRPLAY_CODE: {
+                    String[] codes = {io.freemytv.airplay.Advert.CODE_OFF, io.freemytv.airplay.Advert.CODE_FIRST,
+                            io.freemytv.airplay.Advert.CODE_ALWAYS};
+                    int at = java.util.Arrays.asList(codes).indexOf(airplayCode);
+                    AirPlay.putSetting(getContext(), "code", codes[(at + dir + codes.length) % codes.length]);
+                    AirPlay.reload(getContext());
+                    readAirPlay();
+                    return;
+                }
+                case S_QUOTES: Prefs.setQuotes(!Prefs.quotes()); break;
                 default:
-                    if (!Prefs.quotes()) return;
-                    Prefs.setCoin(focus - COIN_ROWS, !Prefs.coin(focus - COIN_ROWS));
+                    if (id < S_COIN || !Prefs.quotes()) return;
+                    Prefs.setCoin(id - S_COIN, !Prefs.coin(id - S_COIN));
                     break;
             }
             HomeData.get(getContext()).settingsChanged();
@@ -760,6 +880,36 @@ public class SettingsActivity extends Activity {
                 return true;
             });
             dialog.show();
+        }
+
+        /** The name iPhones list: typed here, or empty for the TV's own name + " AirPlay". */
+        private void askAirPlayName() {
+            EditText field = new EditText(activity);
+            field.setSingleLine(true);
+            field.setText(AirPlay.customName(getContext()));
+            field.setHint(Ui.tr("Vazio: o nome da TV", "Empty: the TV's name", "Vacío: el nombre del TV"));
+            field.setImeOptions(EditorInfo.IME_ACTION_DONE);
+            AlertDialog dialog = new AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                    .setTitle(Ui.tr("Nome do AirPlay", "AirPlay name", "Nombre de AirPlay"))
+                    .setView(field)
+                    .setPositiveButton(Ui.tr("Salvar", "Save", "Guardar"), (d, which) -> saveAirPlayName(field.getText().toString()))
+                    .setNegativeButton(Ui.tr("Cancelar", "Cancel"), null)
+                    .create();
+            field.setOnEditorActionListener((v, action, event) -> {
+                dialog.dismiss();
+                saveAirPlayName(field.getText().toString());
+                return true;
+            });
+            dialog.show();
+        }
+
+        private void saveAirPlayName(String name) {
+            String clean = name.trim().isEmpty() ? "" : io.freemytv.airplay.Advert.safeName(name);
+            if (clean.equals(AirPlay.customName(getContext()))) return;
+            AirPlay.putSetting(getContext(), "name", clean);
+            AirPlay.reload(getContext());
+            readAirPlay();
+            invalidate();
         }
 
         private void searchCity(String name) {
@@ -794,11 +944,11 @@ public class SettingsActivity extends Activity {
         }
 
         private boolean scrolling() {
-            return screen == PICKER || screen == SHELF_EDIT;
+            return screen == PICKER || screen == SHELF_EDIT || screen == HOME_SETTINGS;
         }
 
         private int listSize() {
-            return screen == SHELF_EDIT ? shelfRows.size() : pickLabels.size();
+            return screen == SHELF_EDIT ? shelfRows.size() : screen == HOME_SETTINGS ? settingRows().size() : pickLabels.size();
         }
 
         // MARK: - Shelf editor
@@ -871,7 +1021,7 @@ public class SettingsActivity extends Activity {
                 c.drawText(TextUtils.ellipsize(app[1], new TextPaint(rowLabel), 520 * k, TextUtils.TruncateAt.END).toString(), rowRect.left + 30 * k, base, rowLabel);
                 c.drawText(place >= 0 ? "#" + (place + 1) : Ui.tr("Fora", "Off"), rowRect.right - 30 * k, base, rowValue);
             }
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
+            Paint hint = hint();
             float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
             c.drawText(Ui.tr("OK põe ou tira da prateleira (até " + HomeApps.MAX_SHELF + "). ← → mudam a ordem.",
                     "OK adds or removes (up to " + HomeApps.MAX_SHELF + "). ← → change the order.",
@@ -913,7 +1063,7 @@ public class SettingsActivity extends Activity {
                     Symbols.draw(getContext(), c, "check", rowRect.right - 30 * k - cw / 2, rowRect.centerY(), 26 * k, blend(0xFFFFFFFF, INK, f));
                 }
             }
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
+            Paint hint = hint();
             float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
             c.drawText((pickScroll + focus + 1) + " / " + pickLabels.size() + "  ·  " + Ui.tr("OK escolhe, Voltar cancela.", "OK picks, Back cancels."),
                     LIST_X * k + 30 * k, hy, hint);
@@ -923,27 +1073,32 @@ public class SettingsActivity extends Activity {
             boolean keys = screen == REMOTE_KEYS;
             String[] labels = keys ? keyLabels() : settingLabels();
             String[] values = keys ? keyValues() : settingValues();
+            int rows = keys ? labels.length : rowCount(), from = keys ? 0 : pickScroll;
             Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
             c.drawText(keys ? Ui.tr("Botões do Controle", "Remote Buttons") : Ui.tr("Ajustes do Início", "Home Settings"),
                     LIST_X * k + 30 * k, (LIST_TOP - 24) * k, heading);
-            for (int i = 0; i < labels.length; i++) {
+            for (int i = 0; i < rows; i++) {
                 float y = (LIST_TOP + 20 + i * (LIST_ROW_H + LIST_ROW_GAP)) * k;
                 rowRect.set(LIST_X * k, y, LIST_R * k, y + LIST_ROW_H * k);
                 float f = drawRowBackground(c, i);
                 rowLabel.setColor(blend(0xF2FFFFFF, INK, f));
-                boolean locked = !keys && i >= COIN_ROWS && !Prefs.quotes();
+                boolean locked = !keys && settingRow(i) >= S_COIN && !Prefs.quotes();
                 rowValue.setColor(blend(locked ? 0x59FFFFFF : 0xB3FFFFFF, locked ? 0x591C1C1E : 0xB31C1C1E, f));
                 if (locked) rowLabel.setColor(blend(0x73FFFFFF, 0x731C1C1E, f));
                 float base = rowRect.centerY() + Ui.halfCap(rowLabel);
-                c.drawText(labels[i], rowRect.left + 30 * k, base, rowLabel);
-                c.drawText(values[i], rowRect.right - 30 * k, base, rowValue);
+                c.drawText(labels[from + i], rowRect.left + 30 * k, base, rowLabel);
+                c.drawText(values[from + i], rowRect.right - 30 * k, base, rowValue);
             }
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
-            float hy = (LIST_TOP + 20 + labels.length * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
-            c.drawText(Ui.tr("OK ou as setas mudam o valor.", "OK or the arrows change the value."), LIST_X * k + 30 * k, hy, hint);
+            Paint hint = hint();
+            float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
+            // A list longer than the screen: where we are in it, as in the app picker.
+            String where = rows < labels.length ? (from + focus + 1) + " / " + labels.length + "  ·  " : "";
+            c.drawText(where + Ui.tr("OK ou as setas mudam o valor.", "OK or the arrows change the value."), LIST_X * k + 30 * k, hy, hint);
             if (keys) {
                 c.drawText(RemoteKeys.VESTEL ? Ui.tr("YouTube, Prime Video e Google Play: a própria TV controla esses botões.",
                         "YouTube, Prime Video and Google Play: the TV itself controls those buttons.")
+                        : RemoteKeys.KTC ? Ui.tr("Netflix, YouTube e Prime Video: a própria TV controla esses botões.",
+                        "Netflix, YouTube and Prime Video: the TV itself controls those buttons.")
                         : RemoteKeys.supported() ? Ui.tr("Disney e Globoplay: a própria TV controla esses botões.",
                         "Disney and Globoplay: the TV itself controls those buttons.")
                         : Ui.tr("Esses são os botões do controle da TCL: nesta TV, os botões funcionam como sempre.",
@@ -966,8 +1121,8 @@ public class SettingsActivity extends Activity {
                 String[] city = cities.get(pickScroll + focus);
                 Prefs.setCity(city[1], city[2], city[3]);
                 HomeData.get(c).settingsChanged();
-                focus = CITY_ROW;
                 screen = HOME_SETTINGS;
+                focusSetting(S_CITY);
             } else if (screen == PICKER) {
                 int at = pickScroll + focus;
                 Prefs.setKeyApp(Prefs.KEYS[pickFor - 1], appPkgs.get(at));
@@ -979,8 +1134,11 @@ public class SettingsActivity extends Activity {
                 return;
             } else if (screen == REMOTE_KEYS) {
                 openPicker(focus + 1);
-            } else if (screen == HOME_SETTINGS && focus == CITY_ROW) {
+            } else if (screen == HOME_SETTINGS && settingRow(focus) == S_CITY) {
                 askCity();
+                return;
+            } else if (screen == HOME_SETTINGS && settingRow(focus) == S_AIRPLAY_NAME) {
+                askAirPlayName();
                 return;
             } else if (screen == HOME_SETTINGS) {
                 adjust(1);
@@ -994,8 +1152,11 @@ public class SettingsActivity extends Activity {
                 pause();
                 activity.showPreview();
             } else if (focus == 2) {
+                liveTv = HomeApps.liveTv(c) != null;
+                readAirPlay();
                 screen = HOME_SETTINGS;
                 focus = 0;
+                pickScroll = 0;
             } else if (focus == 3) {
                 openShelfEditor();
             } else if (focus == 4) {

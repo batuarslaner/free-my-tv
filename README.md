@@ -24,7 +24,8 @@ Open source. Built with Claude Code. One button to undo.
 - **Light by day, dark by night.** It follows your city's real sunset, the way your phone does.
 - **A screensaver to match.** Full-screen photos of the picks with a big glass clock.
 - **Fast.** 60 fps, every frame in 16.6 ms, on the TV's own chip. The home screen uses 96 MB of memory instead of 242 MB (−60%).<br><sub>Measured on a 98″ TCL Google TV running Android 14.</sub>
-- **Set up on the TV.** Language, your city, temperature, theme, the weather and prices cards, which coins, and the apps on the shelf, in Free My TV's own settings.
+- **AirPlay from iPhone and iPad.** Mirror the screen, with sound, on Google TV and Android TV; an on-screen code if you want one. It needs a small separate plugin ([below](#airplay)).
+- **Set up on the TV.** Language, your city, temperature, theme, look and text size, the weather and prices cards, which coins, and the apps on the shelf, in Free My TV's own settings.
 - **Safe.** No root. Nothing is uninstalled. One button brings back the factory home screen.
 
 ## Install
@@ -114,10 +115,13 @@ The first values come from `config.properties`, created by the first build (Goog
 | `tmdb_region` | Your country (two letters): which titles are on which app | `US` |
 | `latitude`, `longitude` | Your city, for the weather and the sunset | New York |
 | `city` | The name on the weather card | `Weather` |
-| `language` | `auto` (follows the TV), `en`, `es`, `pt`, `ru` or `de` | `auto` |
+| `language` | `auto` (follows the TV), `en`, `es`, `pt`, `ru`, `de` or `tr` | `auto` |
 | `show_crypto` | Show Binance crypto prices on home and screensaver | `true` |
 | `currency` | Crypto prices in `USD`, `EUR`, `BRL`… | `USD` |
 | `temperature` | `C`, `F` or `auto` | `auto` |
+| `look` | `glass` (frosted glass) or `sharp` (flat panels, hairline borders, more contrast) | `glass` |
+| `text_size` | `normal` or `large` (the smaller text on the home screen, bigger and bolder) | `normal` |
+| `power_on` | What the TV shows when it turns on: `home` or `live` (live TV, Google TV only) | `home` |
 | `disable_assistant` | Also turn off Google Assistant | `false` |
 
 Changed something? Run `./build.sh` and install again. Keep `freemytv.keystore`: updates are signed with it.
@@ -125,6 +129,18 @@ Changed something? Run `./build.sh` and install again. Keep `freemytv.keystore`:
 ### The TMDB key
 
 Free, and it takes two minutes: create an account at [themoviedb.org](https://www.themoviedb.org/signup), then open [Settings → API](https://www.themoviedb.org/settings/api) and request a developer key. Paste the *API Read Access Token* (or the *API Key*) after `tmdb_key=`. It's your key: `config.properties` stays out of git.
+
+## AirPlay
+
+Screen mirroring from an iPhone or iPad, with sound, on Google TV and Android TV (in Free My TV mode). It needs FairPlay, Apple's key exchange, which only exists as GPL-3.0 code, so it comes as a small separate app, the *FairPlay plugin* ([`fairplay/`](fairplay)), signed with your key:
+
+```bash
+./build.sh               # the app (as usual)
+./build.sh --fairplay    # the plugin -> FreeMyTV-FairPlay.apk
+adb install -r FreeMyTV-FairPlay.apk
+```
+
+Then on the iPhone: Control Center → *Screen Mirroring* → your TV. Back twice on the remote stops it. In *Free My TV* → *Home Settings*: *AirPlay* on or off, *AirPlay name* (by default the TV's name + "AirPlay"), and *AirPlay code* (off, the first time a device connects, or every time). Without the plugin, everything else works as before. `./build.sh --selftest` checks the receiver on a computer (a JDK is enough).
 
 ## Going back
 
@@ -173,10 +189,11 @@ It's your code, and Claude Code finds its way around it. Try:
 ## How it works
 
 - **A plain Android app, no Gradle, no libraries.** [`build.sh`](build.sh) runs aapt2 → javac → d8 → zipalign → apksigner and makes a 2 MB APK.
-- **It uses the TV's own ADB, from inside the TV.** The app connects to `127.0.0.1:5555` with its own key (that's the *Allow USB debugging?* prompt) and runs the same commands you would: `cmd package set-home-activity`, `settings put secure screensaver_components`, `pm disable-user`. Nothing listens to the network.
+- **It uses the TV's own ADB, from inside the TV.** The app connects to `127.0.0.1:5555` with its own key (that's the *Allow USB debugging?* prompt) and runs the same commands you would: `cmd package set-home-activity`, `settings put secure screensaver_components`, `pm disable-user`. The switching never listens to the network; only AirPlay does (below), and it can't switch anything.
 - **Drawn by hand on one Canvas**, with Android 13 shaders for the frosted glass and the sky (plain fills on Android 9 to 12, with lighter shadows and no GPU layers on 9 to 11 for their older GPUs).
 - **A safety net.** A watchdog in a separate process brings back the stock home screen after three crashes in five minutes, and a boot check keeps your choice after TV updates.
 - **On LG and Samsung, the same design in plain HTML, CSS and JavaScript** ([`web/`](web)), written for the Chromium of older TVs, with no frameworks. [`webos/build.py`](webos/build.py) packs it with `config.properties` into an `.ipk` without LG's tools, and [`webos/install.py`](webos/install.py) installs it through Developer Mode; on LG it lists and opens apps through the TV's own service bus (Luna), as LG's launcher does. [`tizen/build.py`](tizen/build.py) packs the same app into a Samsung `.wgt`, which uses Tizen's web APIs for the apps and the inputs. To preview it on a computer: `python3 webos/build.py --preview`, then open `out/webos/index.html` (a stand-in lists sample apps).
+- **AirPlay, written from scratch in plain Java** ([`app/src/io/freemytv/airplay/`](app/src/io/freemytv/airplay)): Bonjour through Android's own mDNS, RTSP, pairing (X25519 and Ed25519 ported from TweetNaCl, SRP-6a for the code), the mirror stream into the TV's hardware decoder (MediaCodec) and AAC-ELD sound, in its own `:airplay` process. FairPlay alone is in the GPL-3.0 plugin, reached through Android's Binder.
 - **Data** from TMDB (trending titles, new releases and which app streams what in your country), Open-Meteo (forecast, sunrise and sunset), and optionally Binance (24-hour prices when `show_crypto=true`).
 
 | File | What it is |
@@ -192,6 +209,8 @@ It's your code, and Claude Code finds its way around it. Try:
 | [`Prefs.java`](app/src/io/freemytv/Prefs.java) | Settings changed on the TV |
 | [`RemoteKeys.java`](app/src/io/freemytv/RemoteKeys.java) | The TCL remote's app buttons |
 | [`Watchdog.java`](app/src/io/freemytv/Watchdog.java) | The safety net |
+| [`airplay/Receiver.java`](app/src/io/freemytv/airplay/Receiver.java) | AirPlay: the receiver (with `AirPlayService`, `AirPlayVideo`, `AirPlayAudio`) |
+| [`fairplay/`](fairplay) | AirPlay's FairPlay plugin (GPL-3.0, a separate APK) |
 | [`web/home.js`](web/home.js) | The home screen on LG TVs |
 | [`web/tv.js`](web/tv.js) | The TV's apps and inputs, on LG and Samsung |
 | [`webos/build.py`](webos/build.py), [`webos/install.py`](webos/install.py) | The LG app package and its install |
@@ -201,18 +220,19 @@ The website ([freemytv.io](https://freemytv.io)) is in [`docs/`](docs): plain HT
 
 ## Privacy
 
-No accounts, no analytics, no tracking. The app talks to TMDB, Open-Meteo (with the coordinates you set, or your time zone's main city), and Binance only when `show_crypto=true`. Your settings stay on your computer and your TV.
+No accounts, no analytics, no tracking. AirPlay stays on your home network. The app talks to TMDB, Open-Meteo (with the coordinates you set, or your time zone's main city), and Binance only when `show_crypto=true`. Your settings stay on your computer and your TV.
 
 ## Credits
 
 - Built with [Claude Code](https://claude.com/claude-code).
 - The LG version builds on what [@danielthejoker18](https://github.com/danielthejoker18) found in [FreeMyTvWebOS](https://github.com/danielthejoker18/FreeMyTvWebOS) (MIT): installing through Developer Mode and opening apps through the TV's service bus.
+- AirPlay: FairPlay from [PlayFair](https://github.com/EstebanKubata/playfair) by EstebanKubata (GPL-3.0) through the Java port in [java-airplay](https://github.com/serezhka/java-airplay) by serezhka (MIT), whose captured requests also feed the self-test; the protocol details as [UxPlay](https://github.com/FDH2/UxPlay) documents and implements them; X25519 and Ed25519 after [TweetNaCl](https://tweetnacl.cr.yp.to/) (public domain).
 - On Samsung TVs it installs with [TizenBrew Installer](https://github.com/reisxd/TizenBrewInstaller) by [@reisxd](https://github.com/reisxd).
 - This product uses the TMDB API but is not endorsed or certified by [TMDB](https://www.themoviedb.org/).
 - Weather data by [Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0). Prices from the [Binance](https://www.binance.com/) public API.
-- Icons: [Material Symbols](https://fonts.google.com/icons) (Apache 2.0). Font: [Inter](https://rsms.me/inter/) (SIL OFL 1.1). Coin logos: [cryptocurrency-icons](https://github.com/spothq/cryptocurrency-icons) (CC0).
+- Icons: [Material Symbols](https://fonts.google.com/icons) (Apache 2.0). Font: [Inter](https://rsms.me/inter/) (SIL OFL 1.1). Coin logos: [cryptocurrency-icons](https://github.com/spothq/cryptocurrency-icons) (CC0). The shelf's app logos come from [Wikimedia Commons](https://commons.wikimedia.org/) when you build (`tools/logos.py`, needs `rsvg-convert`); they are not in the repository.
 - Not affiliated with Google, TCL, LG, Samsung or any streaming service. App names and logos belong to their owners.
 
 ## License
 
-[MIT](LICENSE). Fork it, change it, ship it.
+[MIT](LICENSE). Fork it, change it, ship it. The one exception is the optional FairPlay plugin in [`fairplay/`](fairplay): GPL-3.0 ([its license](fairplay/LICENSE)), a separate app built and installed on its own; none of its code is in Free My TV.

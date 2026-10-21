@@ -4,6 +4,16 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# --- ./build.sh --selftest [captureDir]: the AirPlay receiver's self-test, on a JDK 17 alone (no Android SDK)
+if [ "${1:-}" = "--selftest" ]; then
+  J="${JAVA_HOME:+$JAVA_HOME/bin/}"
+  rm -rf out/selftest && mkdir -p out/selftest
+  "${J}javac" -nowarn -encoding UTF-8 -d out/selftest \
+    $(find app/src/io/freemytv/airplay tools/airplay_selftest fairplay/test -name '*.java') \
+    $(find fairplay/src -name '*.java' ! -name FairPlayService.java)
+  exec "${J}java" -cp out/selftest SelfTest "${2:-}"
+fi
+
 # --- Tools
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 if [ -z "$SDK" ]; then
@@ -19,6 +29,24 @@ AJ="$(ls -d "$SDK"/platforms/android-*/android.jar 2>/dev/null | sort -V | tail 
 JAVAC="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
 KEYTOOL="${JAVA_HOME:+$JAVA_HOME/bin/}keytool"
 command -v "$JAVAC" >/dev/null 2>&1 || { echo "JDK not found. Install JDK 17 and set JAVA_HOME."; exit 1; }
+
+# --- ./build.sh --fairplay: the GPL-3.0 FairPlay plugin for AirPlay (fairplay/), signed with the app's key
+if [ "${1:-}" = "--fairplay" ]; then
+  [ -f freemytv.keystore ] || { echo "Build the app first (./build.sh): the plugin is signed with its key."; exit 1; }
+  P=out/fairplay
+  rm -rf "$P" && mkdir -p "$P/classes"
+  "$BT/aapt2" link -o "$P/base.apk" -I "$AJ" --manifest fairplay/AndroidManifest.xml \
+    --min-sdk-version 28 --target-sdk-version 33
+  "$JAVAC" -nowarn -Xlint:-options -source 8 -target 8 -bootclasspath "$AJ:$BT/core-lambda-stubs.jar" -classpath "$AJ" \
+    -encoding UTF-8 -d "$P/classes" $(find fairplay/src -name '*.java')
+  "$BT/d8" --release --min-api 28 --lib "$AJ" --output "$P" $(find "$P/classes" -name '*.class')
+  (cd "$P" && zip -qj base.apk classes.dex)
+  "$BT/zipalign" -f -p 4 "$P/base.apk" "$P/aligned.apk"
+  "$BT/apksigner" sign --ks freemytv.keystore --ks-pass pass:freemytv --key-pass pass:freemytv \
+    --out FreeMyTV-FairPlay.apk "$P/aligned.apk"
+  echo "Built FreeMyTV-FairPlay.apk (GPL-3.0, source in fairplay/)"
+  exit 0
+fi
 
 # --- Settings: config.properties -> Config.java
 if [ ! -f config.properties ]; then
@@ -57,10 +85,19 @@ final class Config {
     static final String LANGUAGE = "$(prop language auto)";
     static final String CURRENCY = "$(prop currency USD)";
     static final String TEMPERATURE = "$(prop temperature auto)";
+    static final String POWER_ON = "$(prop power_on home)";
+    static final String LOOK = "$(prop look glass)";
+    static final String TEXT_SIZE = "$(prop text_size normal)";
     static final boolean DISABLE_ASSISTANT = $ASSIST;
     static final boolean SHOW_CRYPTO = $CRYPTO;
 }
 EOF
+
+# --- Official app logos for the shelf (tools/logos.py, from Wikimedia Commons; trademarks, so never in git). Fetched
+# once; offline or without rsvg-convert, the shelf lifts the logos from the apps' own TV art instead.
+if [ -z "$(ls -A app/assets/logos 2>/dev/null)" ] && command -v python3 >/dev/null 2>&1; then
+  python3 -I tools/logos.py || echo "Logos not downloaded: the shelf uses the apps' own art."
+fi
 
 # --- Build
 "$BT/aapt2" compile --dir app/res -o out/res.zip

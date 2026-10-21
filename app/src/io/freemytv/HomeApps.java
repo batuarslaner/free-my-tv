@@ -12,10 +12,11 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
+import android.graphics.Matrix;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -55,8 +56,6 @@ final class HomeApps {
     private HomeApps() {}
 
     static final int APP = 0, LIVE_TV = 1, INPUT = 2, ALL_APPS = 3, SETTINGS = 4, ANDROID_SETTINGS = 5;
-    /** The "HDMI Inputs" button: opens the bottom drawer on the inputs (the home screen handles it). */
-    static final int INPUTS = 7;
     /** Image size of each card (16:9; on screen it shows up to ~330 px wide). */
     static final int TILE_W = 384, TILE_H = 216;
 
@@ -69,6 +68,8 @@ final class HomeApps {
         Bitmap logoDark;    // version for a light background (YouTube's white icon), if any
         float logoInk;      // fraction of the logo with ink (thin logos are drawn larger, with the same "weight")
         float logoScale = 1; // size tweak by eye (compact logos need more)
+        /** The official logo already rendered for a focused tile size (key: tile width * 4096 + height), or null. */
+        android.util.SparseArray<Bitmap> logoSizes;
         boolean connected = true;
     }
 
@@ -92,8 +93,11 @@ final class HomeApps {
         {"spotify", "Spotify", "com.spotify.tv.android", "1DB954", "", "1"},
     };
     static final int MAX_SHELF = 8;
+    /** The live TV card in the shelf's package list: Settings > Shelf moves it or takes it off like an app. */
+    static final String LIVE = "freemytv:live";
     /** Live TV apps of some brands (the antenna's channels open through the standard Android request first). */
-    static final String[] LIVE_TV_APPS = {"com.tcl.tv", "com.google.android.tv", "com.mediatek.wwtv.tvcenter", "com.sony.dtv.tvx"};
+    static final String[] LIVE_TV_APPS = {"com.tcl.tv", "com.google.android.tv", "com.mediatek.wwtv.tvcenter", "com.sony.dtv.tvx",
+            "com.mediatek.tv.oneworld.tvcenter"};
     /** Kept out of "All Apps" (only hidden, still installed). Add the ones your TV shows that you never use. */
     private static final Set<String> HIDDEN = new HashSet<>(java.util.Arrays.asList(
             "com.google.android.play.games",        // Google Play Games
@@ -123,6 +127,10 @@ final class HomeApps {
         PackageManager pm = c.getPackageManager();
         for (String pkg : shelfPackages(c)) {
             if (items.size() >= MAX_SHELF) break;
+            if (pkg.equals(LIVE)) {
+                if (liveTv(c) != null) items.add(liveCard(c));
+                continue;
+            }
             Intent launch = launchIntent(pm, pkg);
             if (launch == null) continue;
             ResolveInfo ri = pm.resolveActivity(launch, 0);
@@ -143,6 +151,7 @@ final class HomeApps {
                 if (it.logo != null) it.logoInk = ink(it.logo);
                 it.logoDark = ownLogoCached(c, d[0] + "-dark");
                 it.logoScale = Float.parseFloat(d[5]);
+                if (it.logo != null) it.logoSizes = ownLogoSizes(c, d[0]);
             }
             items.add(it);
         }
@@ -154,21 +163,23 @@ final class HomeApps {
         return null;
     }
 
-    /** The shelf's packages in order: the user's list (Settings > Shelf), or the built-in one. */
+    /** The shelf's packages in order: the user's list (Settings > Shelf), or the built-in one (live TV first, if any). */
     static List<String> shelfPackages(Context c) {
         List<String> custom = Prefs.shelf();
         if (custom != null) return custom;
         List<String> out = new ArrayList<>();
         PackageManager pm = c.getPackageManager();
+        if (liveTv(c) != null) out.add(LIVE);
         for (String[] d : SHELF) if (out.size() < MAX_SHELF && launchIntent(pm, d[2]) != null) out.add(d[2]);
         return out;
     }
 
-    /** Every app the shelf could hold, as {package, name}: the ones from SHELF first, then the other TV apps by name. */
+    /** Every app the shelf could hold, as {package, name}: live TV, the ones from SHELF, then the other TV apps by name. */
     static List<String[]> shelfCandidates(Context c) {
         PackageManager pm = c.getPackageManager();
         List<String[]> out = new ArrayList<>();
         Set<String> seen = new HashSet<>();
+        if (liveTv(c) != null) out.add(new String[] {LIVE, Ui.tr("TV ao Vivo", "Live TV")});
         for (String[] d : SHELF) if (launchIntent(pm, d[2]) != null && seen.add(d[2])) out.add(new String[] {d[2], d[1]});
         List<String[]> more = new ArrayList<>();
         Intent query = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
@@ -193,6 +204,42 @@ final class HomeApps {
         return items;
     }
 
+    /** The shelf's live TV card: the TV symbol over its name, white, on a dark card (drawn like an app's logo). */
+    private static Item liveCard(Context c) {
+        Item it = new Item();
+        it.kind = LIVE_TV;
+        it.key = "live";
+        it.pkg = LIVE;
+        it.label = Ui.tr("TV ao Vivo", "Live TV");
+        it.logo = liveLogo(c, it.label);
+        it.logoInk = ink(it.logo);
+        return it;
+    }
+
+    /** Built once per language (the name is part of the image). */
+    private static Bitmap liveLogo(Context c, String label) {
+        String key = "live@" + label;
+        synchronized (LOGOS) {
+            if (LOGOS.containsKey(key)) return LOGOS.get(key);
+        }
+        final float symbol = 160, gap = 26;
+        Paint text = Ui.text(Ui.displaySemibold, 56, 0xFFFFFFFF);
+        text.setTextAlign(Paint.Align.CENTER);
+        float sw = Symbols.width(c, "live_tv", symbol), sh = Symbols.height(c, "live_tv", symbol);
+        float cap = Ui.cap(text), tw = text.measureText(label);
+        int w = (int) Math.ceil(Math.max(sw, tw)) + 8, h = (int) Math.ceil(sh + gap + cap + text.descent()) + 8;
+        Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(b);
+        Symbols.draw(c, canvas, "live_tv", w / 2f, 4 + sh / 2, symbol, 0xFFFFFFFF);
+        canvas.drawText(label, w / 2f, 4 + sh + gap + cap, text);
+        Bitmap logo = trimLogo(b);
+        logo.setHasMipMap(true);
+        synchronized (LOGOS) {
+            LOGOS.put(key, logo);
+        }
+        return logo;
+    }
+
     private static Item shortcut(int kind, String key, String label, String symbol) {
         Item it = new Item();
         it.kind = kind;
@@ -200,16 +247,6 @@ final class HomeApps {
         it.label = label;
         it.symbol = symbol;
         return it;
-    }
-
-    /** Icon button (the ones in the corner of the home screen). */
-    static Item action(int kind, String key, String label, String symbol) {
-        return shortcut(kind, key, label, symbol);
-    }
-
-    /** Free My TV settings, in the corner of the home screen. */
-    static Item settings() {
-        return shortcut(SETTINGS, "settings", Ui.tr("Ajustes", "Settings"), "settings");
     }
 
     /** Shortcuts in the bottom drawer. */
@@ -398,6 +435,10 @@ final class HomeApps {
      */
     static Intent liveTv(Context c) {
         PackageManager pm = c.getPackageManager();
+        // MediaTek OneWorld TV Center (KTC/NextStar) has one input per tuner mode (antenna, cable, satellite): tuning one
+        // switches the TV to that mode and hides the other channel lists, so it opens as it is, on its own last channel.
+        Intent oneWorld = launchIntent(pm, "com.mediatek.tv.oneworld.tvcenter");
+        if (oneWorld != null) return oneWorld;
         String tuner = tunerInput(c);
         Intent mediaTek = launchIntent(pm, "com.mediatek.wwtv.tvcenter");
         if (mediaTek != null && tuner != null) {
@@ -784,19 +825,25 @@ final class HomeApps {
         int size = Math.round(TILE_H * 0.56f);
         float left = (TILE_W - size) / 2f, top = (TILE_H - size) / 2f;
         if (icon instanceof AdaptiveIconDrawable) {
-            // Adaptive icon: the layers clipped to a squircle, like an Apple icon.
+            // Adaptive icon: the layers in a squircle, like an Apple icon. Drawn apart, then filling an anti-aliased
+            // rounded rectangle (clipPath leaves stair-stepped corners).
             AdaptiveIconDrawable a = (AdaptiveIconDrawable) icon;
-            Path clip = new Path();
-            clip.addRoundRect(new RectF(left, top, left + size, top + size), size * 0.2237f, size * 0.2237f, Path.Direction.CW);
-            canvas.save();
-            canvas.clipPath(clip);
+            Bitmap layers = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            Canvas lc = new Canvas(layers);
             int pad = size / 4;
             for (Drawable layer : new Drawable[] {a.getBackground(), a.getForeground()}) {
                 if (layer == null) continue;
-                layer.setBounds(Math.round(left) - pad, Math.round(top) - pad, Math.round(left) + size + pad, Math.round(top) + size + pad);
-                layer.draw(canvas);
+                layer.setBounds(-pad, -pad, size + pad, size + pad);
+                layer.draw(lc);
             }
-            canvas.restore();
+            int x = Math.round(left), y = Math.round(top);
+            BitmapShader shader = new BitmapShader(layers, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+            Matrix m = new Matrix();
+            m.setTranslate(x, y);
+            shader.setLocalMatrix(m);
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+            p.setShader(shader);
+            canvas.drawRoundRect(x, y, x + size, y + size, size * 0.2237f, size * 0.2237f, p);
         } else {
             // Legacy icon (a free-form drawing with transparency): smaller, no frame.
             int s = Math.round(TILE_H * 0.46f);
@@ -851,6 +898,41 @@ final class HomeApps {
             LOGOS.put("own:" + key, b);
         }
         return b;
+    }
+
+    private static final Map<String, android.util.SparseArray<Bitmap>> LOGO_SIZES = new HashMap<>();
+
+    /**
+     * The official logo rendered by tools/logos.py at each focused shelf tile size (logos/<key>@<W>x<H>.png), read once
+     * per process; null without them (or without the logo itself, so a lifted logo never gets them).
+     */
+    private static android.util.SparseArray<Bitmap> ownLogoSizes(Context c, String key) {
+        synchronized (LOGO_SIZES) {
+            if (LOGO_SIZES.containsKey(key)) return LOGO_SIZES.get(key);
+        }
+        android.util.SparseArray<Bitmap> sizes = null;
+        try {
+            String[] files = c.getAssets().list("logos");
+            Pattern name = Pattern.compile(Pattern.quote(key) + "@(\\d+)x(\\d+)\\.png");
+            boolean master = false;
+            for (String f : files == null ? new String[0] : files) master |= f.equals(key + ".png");
+            for (String f : master && files != null ? files : new String[0]) {
+                Matcher m = name.matcher(f);
+                if (!m.matches()) continue;
+                Bitmap b;
+                try (InputStream in = c.getAssets().open("logos/" + f)) {
+                    b = BitmapFactory.decodeStream(in);
+                }
+                if (b == null) continue;
+                if (sizes == null) sizes = new android.util.SparseArray<>();
+                sizes.put(Integer.parseInt(m.group(1)) * 4096 + Integer.parseInt(m.group(2)), b);
+            }
+        } catch (IOException | NumberFormatException ignored) {
+        }
+        synchronized (LOGO_SIZES) {
+            LOGO_SIZES.put(key, sizes);
+        }
+        return sizes;
     }
 
     private static Bitmap ownLogo(Context c, String key) {

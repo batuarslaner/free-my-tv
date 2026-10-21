@@ -45,6 +45,11 @@ before you do it, and let them do the taps on the TV.
    in `adb shell dumpsys wifi` (each block starts with its `ID:`), and with their OK remove them with
    `adb shell cmd wifi forget-network <id>`.
 9. **Check:** `adb logcat -s FreeMyTV` shows what the switch did.
+10. **AirPlay (optional, iPhone/iPad mirroring):** `./build.sh --fairplay` makes `FreeMyTV-FairPlay.apk` (GPL-3.0,
+    signed with the same `freemytv.keystore`; the app must be built first); `adb install -r FreeMyTV-FairPlay.apk`.
+    It runs in Free My TV mode; on the iPhone, Control Center → *Screen Mirroring* → the TV. *Home Settings* has
+    *AirPlay* (on/off), *AirPlay name* and *AirPlay code*. `adb logcat -s FreeMyTV | grep airplay` shows it working
+    (`airplay: self-check ok`, `plugin 1 ok`, `advertising "…" on 7000`).
 
 ## Installing it on an LG TV (webOS)
 
@@ -149,26 +154,35 @@ HDMI (Chromecast with Google TV, Google TV Streamer, onn 4K, NVIDIA Shield). Set
   Android 13+, with a fallback for 9 to 12). Keep it at 60 fps: no allocations in `onDraw`, no work on the UI thread.
 - `HomeMode` runs every switch as a background job (`ModeJob`) in the main process; the UI is in the `:home`
   process. `Watchdog` goes back to the stock home screen after 3 crashes in 5 minutes.
-- On-screen text: `Ui.tr("pt", "en")`, with the Spanish, German and Russian in `Spanish.java`, `German.java` and
-  `Russian.java` (keyed by the English); text built at runtime uses `Ui.tr(pt, en, es)`, and its German and Russian
+- On-screen text: `Ui.tr("pt", "en")`, with the Spanish, German, Russian and Turkish in `Spanish.java`, `German.java`,
+  `Russian.java` and `Turkish.java` (keyed by the English); text built at runtime uses `Ui.tr(pt, en, es)`, and its German, Russian and Turkish
   come from those files too (patterns for the parts built at runtime). Add them all. Comments in English, short, only where the why
   isn't obvious.
 - Settings come from `config.properties` through the generated `out/gen/io/freemytv/Config.java` (never edit that).
   What the person changes on the TV (`Prefs`: Home Settings, Shelf, Remote Buttons) wins over those first values.
-- The remote's app buttons (`RemoteKeys`, `RemoteKeyService`) use each brand's key codes: they run only on TCL and
-  Vestel TVs, the service is on only in Free My TV mode, and *Original* takes it out of the enabled accessibility
+- The remote's app buttons (`RemoteKeys`, `RemoteKeyService`) use each brand's key codes: they run only on TCL,
+  Vestel and KTC (NextStar) TVs, the service is on only in Free My TV mode, and *Original* takes it out of the enabled accessibility
   services. The system waits for the service on every key, so it lives alone in the `:keys` process: what it reads is
   in `remote-keys.txt` (`Prefs.keyApp`), never in SharedPreferences, and `onKeyEvent` does no heavy work.
   Vestel (F&U and other store brands; MediaTek, Android TV 14 tested) maps its Netflix button to `KEYCODE_STEM_1`, a
   global key (`dumpsys window policy` lists them) that the key filter sees first; its YouTube, Prime Video and Google
   Play buttons stay with the system. The stock lists needed no Vestel entries.
+  KTC (NextStar; MediaTek, Google TV 14 tested) maps its Tabii button to `KEYCODE_BUTTON_8`, also a global key, which
+  KTC's own hot-key receiver would open Tabii with; its Netflix, YouTube and Prime Video buttons stay with the system.
 - After any change, `./build.sh` must end with `Built FreeMyTV.apk`.
+- AirPlay: `io.freemytv.airplay` is plain Java with no `android.*` (it also compiles on a JDK alone, for
+  `./build.sh --selftest`, which must end with `SelfTest: all N checks passed`); the Android side is `AirPlay*` in
+  `io.freemytv`, in its own `:airplay` process (service, player, decoder, sound). FairPlay is only in `fairplay/`
+  (GPL-3.0, its own APK, `./build.sh --fairplay`), reached through a raw Binder (`FairPlayClient`); `app/` holds no
+  FairPlay or PlayFair code, only a SHA-256 to check the plugin. The log never shows keys (only
+  `Bytes.fingerprint`), the identity in `files/airplay-id.txt` or the AirPlay code. Settings: `files/airplay.txt`
+  (written by the settings screen, `AirPlay.reload` tells `:airplay`).
 - LG and Samsung (`web/`): plain ES5 JavaScript and CSS without variables, grid or backdrop-filter, since older TVs
   (webOS 3 and 4, Tizen 3) run a Chromium from 2015 to 2017; only transform and opacity animate. `web/tv.js` is the
   TV's side: on LG, Luna (`listLaunchPoints`, `launch`, the inputs); on Samsung, `tizen.application` (`getAppsInfo`,
   `launch`), the `VIDEOSOURCE` property and `tizen.tvwindow.setSource` for the inputs, then Samsung's viewer
   (`org.tizen.tv-viewer`) to show them. `web/home.js` follows `HomeView`'s layout and behavior, so a design change on
-  Android belongs there too. Text: `tr(pt, en, es)`, with the German and Russian in `web/strings.js` (keyed by the English). Built without a city (`--generic`), `web/zones.js`
+  Android belongs there too. Text: `tr(pt, en, es)`, with the German, Russian and Turkish in `web/strings.js` (keyed by the English). Built without a city (`--generic`), `web/zones.js`
   (`tools/make_zones.py`, from the tz database) turns the TV's time zone into the city, the currency and the region.
   `tools/webapp.py` is what both builds share. Preview: `python3 webos/build.py --preview` (or `tizen/build.py`), then
   open `out/webos/index.html` in a browser (a stand-in lists sample apps).
@@ -182,3 +196,5 @@ HDMI (Chromecast with Google TV, Google TV Streamer, onn 4K, NVIDIA Shield). Set
   *Original* can bring it back.
 - Don't change the TV's picture, sound, network or account settings.
 - Keep the way back working: the *Original* mode and the watchdog.
+- AirPlay listens to the network: the `:airplay` process never reaches `Adb`, `HomeMode.apply*` or anything that
+  runs shell commands; *Original* stops it.
