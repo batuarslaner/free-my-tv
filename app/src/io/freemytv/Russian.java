@@ -112,6 +112,7 @@ final class Russian {
             case "Text size": return "Размер текста";
             case "Normal": return "Обычный";
             case "Large": return "Крупный";
+            case "Navigation sounds": return "Звуки навигации";
             case "Weather widget": return "Виджет погоды";
             // What TalkBack reads on the drawer's weather card (#47)
             case ". High ": return ". Максимум ";

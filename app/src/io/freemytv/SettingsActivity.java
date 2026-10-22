@@ -640,7 +640,7 @@ public class SettingsActivity extends Activity {
         private static final String[] LANGUAGES = {"auto", "pt", "en", "es", "de", "ru", "tr"}, UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"};
         /** Home Settings rows, by what they change (the list depends on the TV: the dollar, Power on). */
         private static final int S_LANGUAGE = 0, S_TEMPERATURE = 1, S_THEME = 2, S_LOOK = 3, S_TEXT_SIZE = 4, S_WEATHER = 5,
-                S_CITY = 6, S_QUOTES = 7, S_POWER = 8, S_AIRPLAY = 9, S_AIRPLAY_NAME = 10, S_AIRPLAY_CODE = 11,
+                S_CITY = 6, S_QUOTES = 7, S_POWER = 8, S_AIRPLAY = 9, S_AIRPLAY_NAME = 10, S_AIRPLAY_CODE = 11, S_SOUNDS = 12,
                 S_COIN = 100;   // S_COIN + the coin's index
         /** Home Settings rows on screen at once; more scroll. */
         private static final int SETTINGS_VISIBLE = 10;
@@ -650,12 +650,12 @@ public class SettingsActivity extends Activity {
         }
 
         /**
-         * Home Settings, in order: language, temperature, theme, look, text size, weather, city, quotes, one row per
-         * coin, Power on (with live TV), then AirPlay (its name and code with the FairPlay plugin).
+         * Home Settings, in order: language, temperature, theme, look, text size, sounds, weather, city, quotes, one row
+         * per coin, Power on (with live TV), then AirPlay (its name and code with the FairPlay plugin).
          */
         private List<Integer> settingRows() {
             List<Integer> rows = new ArrayList<>(java.util.Arrays.asList(S_LANGUAGE, S_TEMPERATURE, S_THEME, S_LOOK,
-                    S_TEXT_SIZE, S_WEATHER, S_CITY, S_QUOTES, S_COIN, S_COIN + 1, S_COIN + 2));
+                    S_TEXT_SIZE, S_SOUNDS, S_WEATHER, S_CITY, S_QUOTES, S_COIN, S_COIN + 1, S_COIN + 2));
             if (dollar()) rows.add(S_COIN + 3);
             if (liveTv) rows.add(S_POWER);
             rows.add(S_AIRPLAY);
@@ -699,6 +699,7 @@ public class SettingsActivity extends Activity {
                 l[i] = id == S_LANGUAGE ? Ui.tr("Idioma", "Language") : id == S_TEMPERATURE ? Ui.tr("Temperatura", "Temperature")
                         : id == S_THEME ? Ui.tr("Tema", "Theme") : id == S_LOOK ? Ui.tr("Visual", "Look")
                         : id == S_TEXT_SIZE ? Ui.tr("Tamanho do texto", "Text size")
+                        : id == S_SOUNDS ? Ui.tr("Sons de navegação", "Navigation sounds")
                         : id == S_WEATHER ? Ui.tr("Widget do clima", "Weather widget") : id == S_CITY ? Ui.tr("Cidade", "City")
                         : id == S_QUOTES ? Ui.tr("Widget de cotações", "Quotes widget") : id == S_POWER ? Ui.tr("Ao ligar", "Power on")
                         : id == S_AIRPLAY ? "AirPlay"
@@ -733,6 +734,7 @@ public class SettingsActivity extends Activity {
                     }
                     case S_LOOK: v[i] = Prefs.look().equals("sharp") ? Ui.tr("Nítido", "Sharp") : Ui.tr("Vidro", "Glass"); break;
                     case S_TEXT_SIZE: v[i] = Prefs.textSize().equals("large") ? Ui.tr("Grande", "Large") : Ui.tr("Normal", "Normal"); break;
+                    case S_SOUNDS: v[i] = onOff(Prefs.sounds()); break;
                     case S_WEATHER: v[i] = onOff(Prefs.weather()); break;
                     case S_CITY: v[i] = !cityStatus.isEmpty() ? cityStatus : Prefs.city().isEmpty() ? "—" : Prefs.city(); break;
                     case S_QUOTES: v[i] = onOff(Prefs.quotes()); break;
@@ -833,6 +835,7 @@ public class SettingsActivity extends Activity {
                 // Two values each, so either arrow switches; the home screen draws itself again with them (Prefs.version).
                 case S_LOOK: Prefs.setLook(Prefs.look().equals("sharp") ? "glass" : "sharp"); return;
                 case S_TEXT_SIZE: Prefs.setTextSize(Prefs.textSize().equals("large") ? "normal" : "large"); return;
+                case S_SOUNDS: Prefs.setSounds(!Prefs.sounds()); break;
                 case S_WEATHER: Prefs.setWeather(!Prefs.weather()); break;
                 case S_CITY: return;
                 case S_AIRPLAY: {

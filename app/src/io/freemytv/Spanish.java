@@ -93,6 +93,7 @@ final class Spanish {
             case "Text size": return "Tamaño del texto";
             case "Normal": return "Normal";
             case "Large": return "Grande";
+            case "Navigation sounds": return "Sonidos de navegación";
             case "Weather widget": return "Widget del clima";
             // What TalkBack reads on the drawer's weather card (#47)
             case ". High ": return ". Máxima ";

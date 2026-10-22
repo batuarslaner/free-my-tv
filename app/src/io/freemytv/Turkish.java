@@ -114,6 +114,7 @@ final class Turkish {
             case "Text size": return "Yazı boyutu";
             case "Normal": return "Normal";
             case "Large": return "Büyük";
+            case "Navigation sounds": return "Navigasyon sesleri";
             case "Weather widget": return "Hava durumu widget'ı";
             // What TalkBack reads on the drawer's weather card (#47)
             case ". High ": return ". En yüksek ";

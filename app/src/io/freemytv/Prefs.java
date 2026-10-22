@@ -120,6 +120,10 @@ final class Prefs {
 
     // MARK: - Widgets and coins
 
+    /** The home screen's soft click when moving and opening (upstream #85). */
+    static boolean sounds() { return sp().getBoolean("sounds", Config.NAVIGATION_SOUNDS); }
+    static void setSounds(boolean on) { put("sounds", on); }
+
     static boolean weather() { return sp().getBoolean("weather", true); }
     static void setWeather(boolean on) { put("weather", on); }
 

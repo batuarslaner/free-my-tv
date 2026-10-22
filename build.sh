@@ -68,6 +68,7 @@ LAT="$(number latitude 40.7128)"
 LON="$(number longitude -74.0060)"
 ASSIST=false; [ "$(prop disable_assistant false)" = "true" ] && ASSIST=true
 CRYPTO=false; [ "$(prop show_crypto true)" = "true" ] && CRYPTO=true
+SOUNDS=false; [ "$(prop navigation_sounds true)" = "true" ] && SOUNDS=true
 
 rm -rf out && mkdir -p out/gen/io/freemytv out/classes
 cat > out/gen/io/freemytv/Config.java <<EOF
@@ -89,6 +90,7 @@ final class Config {
     static final String LOOK = "$(prop look glass)";
     static final String TEXT_SIZE = "$(prop text_size normal)";
     static final boolean DISABLE_ASSISTANT = $ASSIST;
+    static final boolean NAVIGATION_SOUNDS = $SOUNDS;
     static final boolean SHOW_CRYPTO = $CRYPTO;
 }
 EOF
