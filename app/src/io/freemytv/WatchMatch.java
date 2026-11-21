@@ -44,13 +44,16 @@ final class WatchMatch {
 
     // Season and episode as apps write them into a title: S2 E5, S02E05, S2:E5, T2 E5, S2 B2 (Turkish), St. 2 F. 5,
     // 2x05, Season 2, 2. Sezon, Episode 5, 5. Bölüm…
-    private static final Pattern MARKER = Pattern.compile("(?iU)"
+    // Flags as arguments, not inline: Android's regex engine (ICU) rejects "(?U)" and "(?u)" and the class fails to load.
+    // ICU's \b and case folding are already Unicode-aware; UNICODE_CASE does the same on a desktop JDK (tests).
+    private static final Pattern MARKER = Pattern.compile(""
             + "\\b[st]\\s?\\d{1,2}\\s?[:.,-]?\\s?[ebf]\\s?\\d{1,4}\\b"
             + "|\\bst\\.?\\s?\\d{1,2}\\s?f\\.?\\s?\\d{1,4}\\b"
             + "|\\b\\d{1,2}x\\d{1,3}\\b"
             + "|\\b(season|series|sezon|temporada|staffel|saison|stagione|seizoen|sæson|säsong|sezona|сезон)\\s*\\d+"
             + "|\\b\\d+\\.?\\s*(sezon|bölüm|staffel|folge|temporada|сезон|серия)\\b"
-            + "|\\b(episode|ep|bölüm|episodio|episódio|capítulo|capitulo|folge|épisode|aflevering|odcinek|серия)\\.?\\s*\\d+");
+            + "|\\b(episode|ep|bölüm|episodio|episódio|capítulo|capitulo|folge|épisode|aflevering|odcinek|серия)\\.?\\s*\\d+",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     private static final Pattern YEAR = Pattern.compile("\\(\\s*((?:19|20)\\d{2})\\s*\\)");
     private static final Pattern YEAR_ANY = Pattern.compile("(?<!\\d)((?:19|20)\\d{2})(?!\\d)");
     private static final Pattern DIGITS = Pattern.compile("\\d+");
