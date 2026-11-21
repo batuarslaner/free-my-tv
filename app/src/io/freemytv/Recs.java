@@ -67,8 +67,8 @@ final class Recs {
     static final int MAX_CARDS = 6;
 
     /** The backdrops: on a 720p UI, TMDB's 1280-wide copy shows the same and is lighter to download and decode. */
-    private static final String IMAGES = "https://image.tmdb.org/t/p/" + (Backdrop.W <= 1280 ? "w1280" : "original");
-    private static final String POSTERS = "https://image.tmdb.org/t/p/w500";
+    static final String IMAGES = "https://image.tmdb.org/t/p/" + (Backdrop.W <= 1280 ? "w1280" : "original");
+    static final String POSTERS = "https://image.tmdb.org/t/p/w500";
     /** TMDB's Animation genre (movies and shows: cartoons and anime), left out with Picks > Cartoons and anime off. */
     private static final int ANIMATION = 16;
     private static final long LIST_EVERY = 6 * 3600_000L;
@@ -895,7 +895,7 @@ final class Recs {
     }
 
     /** Language of titles and genres (TMDB's "fr-FR", "zh-CN"…); the services come from the region. */
-    private static String lang() {
+    static String lang() {
         String lang = Ui.language;
         if (lang.equals("en")) return "en-US";
         if (lang.equals("pt")) return "pt-BR";
@@ -1066,7 +1066,7 @@ final class Recs {
      * The title's best backdrop: no text written over it (our own text goes on top of it), the closest to 1920 wide
      * (larger only costs download, disk and decoding) and, on a tie, the highest rated.
      */
-    private static String bestBackdrop(JSONObject images) {
+    static String bestBackdrop(JSONObject images) {
         JSONArray list = images == null ? null : images.optJSONArray("backdrops");
         String best = null;
         double bestScore = -1;
@@ -1229,6 +1229,11 @@ final class Recs {
     }
 
     private JSONObject get(String path) throws IOException, org.json.JSONException {
+        return tmdb(path);
+    }
+
+    /** A TMDB API call with the key in use (Continue Watching's lookups too, WatchArt); never logs the key. */
+    static JSONObject tmdb(String path) throws IOException, org.json.JSONException {
         String key = key();
         if (key.isEmpty()) throw new IOException("no TMDB key");
         return request(path, key);

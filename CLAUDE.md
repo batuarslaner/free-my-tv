@@ -351,7 +351,13 @@ entries; its system pieces are in `PROTECTED`. USB debugging opens ADB on 5555 t
   *Original* revokes it with `pm revoke`. Watch Next pictures load from the TV (`content://`, `android.resource://`) and
   from the https addresses the apps themselves left there (Netflix and JioHotstar do, #174), only through `NetPicture`:
   https, no host on the TV or the home network (redirects checked hop by hop), `image/*`, 4 MB, 10 s, and errors that
-  never carry the address. Nothing else may be fetched from an address another app wrote. Besides those, the app talks only to TMDB, Open-Meteo, Binance, Watchmode (with a `watchmode_key`), your Plex
+  never carry the address. Nothing else may be fetched from an address another app wrote. With a TMDB key, `WatchArt`
+  searches TMDB for each item's title (only the title and the language; `WatchMatch` judges the results, plain Java
+  tested by `tools/test-match.sh`) and uses its backdrop and poster, as the picks do: the row is laid out and drawn as
+  the picks' (`layoutRow`, `drawRowCard`), the focused item's photo behind it. TMDB's answers are kept per app and
+  title (`watch-tmdb` preferences: 30 days, "none" 3 days), the images in the cache's `watch` folder, at most 7
+  items' pictures in memory (`WatchArt.keep` drops what left the list). Without a key or a match, the app's own
+  picture (or banner) makes the same set. Besides those, the app talks only to TMDB, Open-Meteo, Binance, Watchmode (with a `watchmode_key`), your Plex
   server (with a `plex_url`), your Immich server (with `immich_server` and its key), Trakt (with a `trakt_client_id`,
   once the person signs in on the TV) and GitHub's releases (Updates): new sources (such as Stremio) must not add
   network calls without the owner's OK.

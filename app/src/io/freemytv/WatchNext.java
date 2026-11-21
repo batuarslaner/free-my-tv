@@ -38,8 +38,13 @@ final class WatchNext {
         String app;                     // the app's name, for the card's details line
         long duration, position, engaged;
         String intent;
+        // For the TMDB lookup (WatchArt): the episode's own title, the season number (0: none), the year (0: unknown)
+        // and TvContract's program type (-1: not given).
+        String episodeTitle;
+        int season, year, type = -1;
+        /** What its pictures are kept under (WatchArt): its app, title and picture. */
+        String artKey;
         final Uri pictureUri;
-        final String pictureKey, bannerKey;
         private final String picture;
 
         Item(String pkg, String poster, String thumbnail) {
@@ -49,8 +54,6 @@ final class WatchNext {
             pictureUri = uri != null && ("content".equalsIgnoreCase(uri.getScheme())
                     || "android.resource".equalsIgnoreCase(uri.getScheme())
                     || "https".equalsIgnoreCase(uri.getScheme())) ? uri : null;
-            pictureKey = pictureUri == null ? null : picture;
-            bannerKey = "banner:" + pkg;
         }
 
         /** The picture for a 16:9 card: the thumbnail (usually 16:9) before the poster. */
@@ -202,7 +205,9 @@ final class WatchNext {
                 TvContract.WatchNextPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS,
                 TvContract.WatchNextPrograms.COLUMN_POSTER_ART_URI,
                 TvContract.WatchNextPrograms.COLUMN_THUMBNAIL_URI,
-                TvContract.WatchNextPrograms.COLUMN_INTENT_URI));
+                TvContract.WatchNextPrograms.COLUMN_INTENT_URI,
+                TvContract.WatchNextPrograms.COLUMN_TYPE,
+                TvContract.WatchNextPrograms.COLUMN_RELEASE_DATE));
         // Preview programs have no engagement time or Watch Next type.
         if (TvContract.WatchNextPrograms.CONTENT_URI.equals(uri)) {
             projection.add(TvContract.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS);
@@ -232,6 +237,11 @@ final class WatchNext {
                 it.position = number(cur, TvContract.WatchNextPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS);
                 it.engaged = number(cur, TvContract.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS);
                 it.intent = text(cur, TvContract.WatchNextPrograms.COLUMN_INTENT_URI);
+                it.episodeTitle = text(cur, TvContract.WatchNextPrograms.COLUMN_EPISODE_TITLE);
+                it.season = Math.max(0, WatchMatch.number(season));
+                it.year = WatchMatch.yearIn(text(cur, TvContract.WatchNextPrograms.COLUMN_RELEASE_DATE));
+                it.type = WatchMatch.number(text(cur, TvContract.WatchNextPrograms.COLUMN_TYPE));
+                it.artKey = pkg + "|" + title + "|" + it.picture();
                 out.add(it);
             }
         } catch (RuntimeException e) {   // a provider that refuses (no permission on some firmware) means nothing to show
