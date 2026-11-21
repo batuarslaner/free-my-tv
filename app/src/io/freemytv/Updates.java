@@ -39,6 +39,9 @@ import java.security.MessageDigest;
  *
  * Checks and installs run in the main process (ModeJob, HomeReceiver), one at a time under this class's lock, and only
  * they write update.json; Settings, in :home, reads it, and the home screen keeps what it told in update-told.
+ *
+ * Fork: signed with your own key, so the project's releases could never install over it. Unless config.properties
+ * says updates=true (Config.UPDATES), nothing here runs: no weekly job, no check, no download, no Updates row.
  */
 final class Updates {
     private Updates() {}
@@ -80,7 +83,7 @@ final class Updates {
 
     /** The week's check, as a job that waits for the network and survives restarts (scheduled once). */
     static void schedule(Context c) {
-        if (!takesReleases(c)) return;
+        if (!Config.UPDATES || !takesReleases(c)) return;
         JobScheduler scheduler = c.getSystemService(JobScheduler.class);
         if (scheduler == null || scheduler.getPendingJob(JOB) != null) return;
         PersistableBundle extras = new PersistableBundle();
@@ -168,6 +171,7 @@ final class Updates {
 
     /** The home screen says once, per version, that one is ready (the week's check found it). */
     static void tellOnce(Activity a) {
+        if (!Config.UPDATES) return;
         long changed = stateFile(a).lastModified();
         if (changed == seen) return;   // most resumes: nothing new, nothing read
         seen = changed;
@@ -189,6 +193,7 @@ final class Updates {
      * process. True when it failed in a way worth trying again soon (the network, GitHub).
      */
     static synchronized boolean check(Context c) {
+        if (!Config.UPDATES) return false;
         JSONObject before = state(c);
         String version = "";
         try {
@@ -386,6 +391,7 @@ final class Updates {
      * opens right after OK, never later over something else.
      */
     static synchronized void install(Context c) {
+        if (!Config.UPDATES) return;
         JSONObject o = state(c);
         String version = o.optString("version"), name = o.optString("file");
         if (!ready(o, installedVersion(c))) return;

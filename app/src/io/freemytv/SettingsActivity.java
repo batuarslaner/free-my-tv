@@ -1031,21 +1031,21 @@ public class SettingsActivity extends Activity {
             if (dollar()) l.add(Ui.tr("Dollar"));
             l.add(Ui.tr("TMDB key"));
             l.add(Ui.tr("Watchmode key"));
-            l.add(Ui.tr("Updates"));
+            if (Config.UPDATES) l.add(Ui.tr("Updates"));   // fork: only with updates=true
             return l.toArray(new String[0]);
         }
 
-        /** The Updates row: the last one, after the coins and the keys. */
+        /** The Updates row: the last one, after the coins and the keys; -1 without it (the fork's default). */
         private int updatesRow() {
-            return settingLabels().length - 1;
+            return Config.UPDATES ? settingLabels().length - 1 : -1;
         }
 
         private int keyRow() {
-            return updatesRow() - 2;
+            return settingLabels().length - (Config.UPDATES ? 3 : 2);
         }
 
         private int watchmodeRow() {
-            return updatesRow() - 1;
+            return keyRow() + 1;
         }
 
         /** A key's row: "Not set", or the key's last 4 characters (all that's ever shown of it). */
@@ -1136,10 +1136,11 @@ public class SettingsActivity extends Activity {
             if (HOME_ROW >= 0) v[HOME_ROW] = onOff(HomeAssistant.on(getContext()));
             v[QUOTES_ROW] = onOff(Prefs.quotes());
             // No quotes widget, nowhere to show prices: the coins read as off (and stay locked) until it is back on.
-            for (int i = COIN_ROWS; i < v.length - 3; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
-            v[v.length - 3] = keyValue(Recs.key());
-            v[v.length - 2] = keyValue(Recs.watchmodeKey());
-            v[v.length - 1] = updatesValue();
+            int keys = keyRow();
+            for (int i = COIN_ROWS; i < keys; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
+            v[keys] = keyValue(Recs.key());
+            v[keys + 1] = keyValue(Recs.watchmodeKey());
+            if (Config.UPDATES) v[keys + 2] = updatesValue();
             return v;
         }
 

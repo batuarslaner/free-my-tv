@@ -62,6 +62,9 @@ ANIMATION=false; [ "$(prop hide_animation false)" = "true" ] && ANIMATION=true
 SAVER=true; [ "$(prop screensaver true)" = "false" ] && SAVER=false
 STREMIO=false; [ "$(prop open_in_stremio false)" = "true" ] && STREMIO=true
 NUVIO=false; [ "$(prop open_in_nuvio false)" = "true" ] && NUVIO=true
+# This fork is signed with your own key, so the project's releases can't update it: no update checks unless
+# updates=true (then it only says when a new upstream version is out, as upstream's own builds do).
+UPDATES=false; [ "$(prop updates false)" = "true" ] && UPDATES=true
 
 # Servers on your own network (Immich, and the next feature that needs one) often answer in plain HTTP. One rule for
 # all of them: a server given as http:// must be on the local network, and only its host may skip HTTPS
@@ -139,6 +142,7 @@ final class Config {
     static final boolean HIDE_ANIMATION = $ANIMATION;
     static final boolean SCREENSAVER = $SAVER;   // false: the TV keeps its own
     static final boolean GENERIC = $GENERIC;   // built with --generic, as the APK on GitHub's releases (Updates)
+    static final boolean UPDATES = $UPDATES;   // fork: false (the default) never looks for upstream releases
     static final boolean OPEN_IN_STREMIO = $STREMIO;
     static final boolean OPEN_IN_NUVIO = $NUVIO;
 }
