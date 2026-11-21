@@ -667,6 +667,9 @@ entries; its system pieces are in `PROTECTED`. USB debugging opens ADB on 5555 t
   `Bytes.fingerprint`), the identity in `files/airplay-id.txt` or the AirPlay code. Settings: `files/airplay.txt`
   (written by the settings screen, `AirPlay.reload` tells `:airplay`); its Home Settings rows are the fork's, after
   the coins and before the keys (`SettingsActivity.forkRows`), so upstream's row numbers stay as they are.
+  The fork's header weather (`HomeView.layoutWeather`, `drawTopWeather`, colored by `Symbols.drawWeather` from the
+  `*_cloud`/`*_accent` PNGs) sits at the top right, left of any top button; `top_buttons` in config.properties
+  (`Config.TOP_BUTTONS`: `default`, `none` or keys) seeds `Prefs.topButtons` until Top Buttons is edited on the TV.
   The fork has no self-updates: `Updates` does nothing unless `updates=true` (`Config.UPDATES`).
 - LG and Samsung (`web/`): plain ES5 JavaScript and CSS without variables, grid or backdrop-filter, since older TVs
   (webOS 3 and 4, Tizen 3) run a Chromium from 2015 to 2017 (`tools/check.sh` greps for all of these); only transform

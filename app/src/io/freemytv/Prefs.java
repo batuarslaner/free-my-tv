@@ -500,6 +500,8 @@ final class Prefs {
      */
     static List<String> topButtons() {
         String v = sp().getString("topButtons", null);
+        // Fork: config.properties' top_buttons (none, or keys in order) until they're edited on the TV.
+        if (v == null && !Config.TOP_BUTTONS.equals("default")) v = Config.TOP_BUTTONS.equals("none") ? "" : Config.TOP_BUTTONS;
         if (v == null) return null;
         List<String> out = new ArrayList<>();
         for (String p : v.split(",")) if (!p.isEmpty()) out.add(p);

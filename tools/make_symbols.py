@@ -25,6 +25,26 @@ MAP = {
     "lightbulb": ("lightbulb", 1), "toggle": ("toggle_on", 1), "fan": ("mode_fan", 1), "blinds": ("blinds", 1),
     "bolt": ("bolt", 1), "smart_button": ("smart_button", 1),
 }
+# Weather symbols drawn in two colors (the fork's header weather, Symbols.drawWeather): a point inside the cloud, as a
+# fraction of the icon. The cloud is saved as NAME_cloud.png and the rest (sun, moon, rain, lightning) as
+# NAME_accent.png, the same size.
+TWO_TONE = {"partly_cloudy_day": (0.25, 0.8), "partly_cloudy_night": (0.25, 0.75), "rainy": (0.5, 0.4),
+            "thunderstorm": (0.5, 0.4)}
+
+
+def save(img, path):
+    rgba = Image.new("RGBA", img.size, (255, 255, 255, 0))
+    rgba.putalpha(img)
+    rgba.save(path, optimize=True)
+
+
+def split(img, seed):
+    """The cloud (every pixel connected to `seed`) and the rest, as two masks the size of `img`."""
+    region = img.point(lambda v: 255 if v > 0 else 0)
+    ImageDraw.floodfill(region, (int(seed[0] * img.width), int(seed[1] * img.height)), 128)
+    cloud = Image.composite(img, Image.new("L", img.size, 0), region.point(lambda v: 255 if v == 128 else 0))
+    accent = Image.composite(img, Image.new("L", img.size, 0), region.point(lambda v: 255 if v == 255 else 0))
+    return cloud, accent
 
 
 def main():
@@ -56,9 +76,11 @@ def main():
         pad = 16
         big = big.crop((box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad))
         img = big.resize((max(1, round(big.width / 8)), max(1, round(big.height / 8))), Image.LANCZOS)
-        rgba = Image.new("RGBA", img.size, (255, 255, 255, 0))
-        rgba.putalpha(img)
-        rgba.save(os.path.join(out, name + ".png"), optimize=True)
+        save(img, os.path.join(out, name + ".png"))
+        if name in TWO_TONE:
+            cloud, accent = split(img, TWO_TONE[name])
+            save(cloud, os.path.join(out, name + "_cloud.png"))
+            save(accent, os.path.join(out, name + "_accent.png"))
     print("ok:", len(MAP), "icons in", out, "axes:", axes)
 
 

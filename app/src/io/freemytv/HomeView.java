@@ -119,7 +119,10 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private static final float L_STATUS = 25, L_STATUS_GAP = 22;
     private static final String[] STATUS_SYMBOLS = {"wifi", "ethernet", "bluetooth", "usb"};
     private static final float L_PLATTER_TOP = 814, L_TILE_H = 126;
-    private static final float L_DATE_BASE = 330, L_CLOCK_BASE = 540, L_WEATHER_BASE = 626, L_QUOTES_BASE = 694;
+    private static final float L_DATE_BASE = 330, L_CLOCK_BASE = 540, L_QUOTES_BASE = 626;
+    // Fork: the weather at the top right, part of the header (not focusable): the colored symbol and the temperature on
+    // the title's baseline, then city · condition and the high and low on the tabs' baseline, right-aligned.
+    private static final float L_WX_ICON = 48, L_WX_ICON_GAP = 16, L_WX_RANGE_GAP = 22, L_WX_LINE_W = 760;
     private static String[] tabs;
     private static int tabsGeneration = -1;
     private static final String[] TAB_KIND = {null, "movie", "tv"};
@@ -213,7 +216,14 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private Paint menuTitlePaint, menuSubPaint, menuOptionPaint;
     private final RectF[] cardRects = new RectF[Recs.MAX_CARDS];
     private final List<HomeApps.Item> lightButtons = new ArrayList<>();
-    private Paint lTitle, lTab, lTabOn, lCardTitle, lCardMeta, lQuote, lTip, lDate, lClock, lWeather, lClockQuote;
+    private Paint lTitle, lTab, lTabOn, lCardTitle, lCardMeta, lQuote, lTip, lDate, lClock, lClockQuote;
+    private Paint lWxCity, lWxTemp, lWxCondition, lWxRange;
+    // The header's weather: its text and positions (whole pixels), measured when the weather or the layout changes, so
+    // drawing measures nothing; wxRect is what it covers.
+    private boolean wxOn;
+    private String wxSymbol = "", wxCity = "", wxTemp = "", wxCondition = "", wxRange = "";
+    private float wxTempX, wxIconX, wxIconY, wxCityX, wxConditionX, wxRangeX, wxTitleBase, wxTabBase;
+    private final RectF wxRect = new RectF();
     private Shader lightGradient;
     // Continue Watching: the background takes the focused card's colour (worked out once per picture, WatchArt), easing
     // from one to the next. Drawn as a plain fill under a fixed shade, so a colour change creates nothing per frame.
@@ -321,12 +331,9 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private static final long BURST_MS = 1500;
     private int w, h;
     private float k = 1;
-    private String clockText = "", dateText = "", weatherLine = "";
+    private String clockText = "", dateText = "";
     /** "Off in 42 min" next to the round buttons while the sleep timer runs (Settings > Sleep Timer); "" otherwise. */
     private String sleepText = "";
-    private long weatherLineAt = -1;
-    private int weatherLinePrefs = -1;
-    private String weatherLineLanguage = "";
     private long clockMinute = -1;
     private boolean okDown, backDown;
     private float touchX, touchY;
@@ -837,6 +844,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         updatePalette();
         checkNight(true);
         layoutStatus();
+        layoutWeather();   // the header's weather
         heroDirty = statusDirty = drawerDirty = true;
         platter.invalidate();
     }
@@ -948,7 +956,10 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         lDate = Ui.text(Ui.semibold, 34 * k, lDim);
         lClock = Ui.numbers(Ui.light, 200 * k, lInk);
         lClock.setLetterSpacing(-0.01f);
-        lWeather = Ui.text(Ui.medium, 34 * k, lDim);
+        lWxTemp = Ui.text(Ui.displayBold, 76 * k, lInk);
+        lWxCity = Ui.text(Ui.bold, 28 * t, lInk);
+        lWxCondition = Ui.text(face(Ui.medium), 28 * t, lInk);
+        lWxRange = Ui.numbers(face(Ui.medium), 26 * t, lDim);
         lClockQuote = Ui.numbers(face(Ui.medium), 28 * t, lDim);
         lightGradient = tintShade = null;
         buttonPaint = Ui.text(Ui.semibold, 29 * k, INK);
@@ -1449,7 +1460,6 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         lTip.setColor(tone(lInk, nInk));
         lDate.setColor(tone(lDim, nDim));
         lClock.setColor(tone(lInk, nInk));
-        lWeather.setColor(tone(lDim, nDim));
         lClockQuote.setColor(tone(lDim, nDim));
         staleQuote.setColor(tone(lFaint, nWhite(0x99)));
         if (continueMode()) applyWatchContrast();
@@ -1833,6 +1843,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         boolean clock = clockMode();
         // At the right margin, under the round buttons: the shelf's glass is narrower and centred with few apps.
         float right = CONTENT_R * k;
+        if (!clock && wxOn) right = Math.min(right, wxCityX - 40 * k);   // the weather's second line is on this row
         applyTone();
         Paint text = clock ? lClockQuote : lQuote;
         // The corner buttons' names appear in this row: the quotes fade out while one of them has focus.
@@ -3775,6 +3786,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             return;
         }
         for (int i = picksMode() ? 0 : 3; i < 3 + lightButtons.size(); i++) out.add(a11yId(Z_TOP, i));
+        if (wxOn) out.add(a11yId(WIDGETS, 2));   // the header's weather
         for (int i = 0; i < Math.min(Recs.MAX_CARDS, cards.size()); i++) out.add(a11yId(Z_CARDS, i));
         if (continueMode()) for (int i = 0; i < watching.size(); i++) out.add(a11yId(Z_WATCH, i));
         for (int i = shelfFirst; i < Math.min(shelf.size(), shelfFirst + shelfVisible); i++) out.add(a11yId(Z_SHELF, i));
@@ -3817,7 +3829,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 }
                 return label(shelf, i);
             case Z_DRAWER: return label(drawerItems, i);
-            case WIDGETS: return i == 0 ? weatherText() : quotesText();
+            case WIDGETS: return i == 0 ? weatherText() : i == 2 ? topWeatherText() : quotesText();
             default: return "";
         }
     }
@@ -3876,6 +3888,12 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 dy = drawerOpen ? 0 : h;
                 break;
             case WIDGETS:
+                if (i == 2) {
+                    if (!wxOn) return false;
+                    a11yRect.set(wxRect);
+                    dy = status.getTranslationY();
+                    break;
+                }
                 if (!drawerOpen) return false;
                 a11yRect.set(i == 0 ? weatherCard : quotesCard);
                 dy = 0;
@@ -4033,6 +4051,15 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         return s.toString();
     }
 
+    /** The header's weather as TalkBack reads it: the city, now, and today's high and low. */
+    private String topWeatherText() {
+        HomeData.Weather wx = data.weather;
+        String city = Prefs.city().isEmpty() ? Ui.tr("Weather") : Prefs.city();
+        if (Double.isNaN(wx.temp)) return city;
+        return city + ". " + HomeData.degrees(wx.temp) + ", " + HomeData.condition(wx.code, wx.isDay) + ". "
+                + Ui.trf("High {max}, low {min}.", "max", HomeData.degrees(wx.max), "min", HomeData.degrees(wx.min));
+    }
+
     /** The weather card as TalkBack reads it: what it shows, in the same words and units. */
     private String weatherText() {
         StringBuilder s = new StringBuilder(Prefs.city().isEmpty() ? Ui.tr("Weather") : Prefs.city());
@@ -4105,7 +4132,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 Symbols.warm(getContext(), name, Symbols.pointSizeForHeight(getContext(), name, L_STATUS * k * statusScale(name)));
             }
         }
-        Symbols.warmWeather(getContext(), 40 * k);
+        layoutWeather();
         heroDirty = statusDirty = true;
         layoutCards();
     }
@@ -4778,20 +4805,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         float x = MARGIN * k;
         c.drawText(dateText, x - Ui.leftBearing(lDate, dateText), L_DATE_BASE * k, lDate);
         c.drawText(clockText, x - Ui.leftBearing(lClock, clockText), L_CLOCK_BASE * k, lClock);
-        HomeData.Weather wx = data.weather;
-        if (!Prefs.weather() || Double.isNaN(wx.temp)) return;
-        if (data.weatherAt != weatherLineAt || Prefs.version != weatherLinePrefs || !Ui.language.equals(weatherLineLanguage)) {
-            weatherLineAt = data.weatherAt;
-            weatherLinePrefs = Prefs.version;
-            weatherLineLanguage = Ui.language;
-            weatherLine = HomeData.degrees(wx.temp) + "  " + HomeData.condition(wx.code, wx.isDay) + "   "
-                    + HomeData.highLow(wx, "  ");
-        }
-        float size = 40 * k, base = L_WEATHER_BASE * k;
-        String symbol = Symbols.weather(wx.code, wx.isDay);
-        float sw = Symbols.width(getContext(), symbol, size);
-        Symbols.draw(getContext(), c, symbol, x + sw / 2, base - Ui.halfCap(lWeather), size, lWeather.getColor());
-        c.drawText(weatherLine, x + sw + 16 * k, base, lWeather);
+        // The weather is in the header at the top right (the fork's), as with the picks.
     }
 
     /**
@@ -4893,6 +4907,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private void drawLightButtons(Canvas c) {
         applyTone();
         drawStatusIcons(c);
+        drawTopWeather(c);
         for (int slot = 0; slot < lightButtons.size(); slot++) {
             int i = slot;
             // The lifted button passes over its neighbors while they exchange places.
@@ -4937,9 +4952,68 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
         if (sleepText.isEmpty()) return;
         float right = (lightButtons.isEmpty() ? CONTENT_R * k : topRects[3].left) - 28 * k, cy = L_BUTTON_CY * k;
+        if (wxOn) right = Math.min(right, wxRect.left - 28 * k);   // left of the header's weather
         float tw = lQuote.measureText(sleepText), size = lQuote.getTextSize();
         c.drawText(sleepText, right - tw, cy + Ui.halfCap(lQuote), lQuote);
         Symbols.draw(getContext(), c, "bedtime", right - tw - size * 0.9f, cy, size, lQuote.getColor());
+    }
+
+    /**
+     * The fork's header weather: its text and positions, measured here (when the weather, the buttons or the screen size
+     * change) so drawing measures nothing. The temperature and its symbol on the title's baseline; city · condition and
+     * the high and low on the tabs' baseline; both lines end at the right margin, or left of the round buttons. Hidden
+     * with the weather widget off or no weather yet; an old forecast stays, as on the drawer's card (which keeps the
+     * rain, the hours or days, and sunrise and sunset).
+     */
+    private void layoutWeather() {
+        if (lWxTemp == null) return;
+        HomeData.Weather wx = data.weather;
+        wxOn = Prefs.weather() && !Double.isNaN(wx.temp);
+        if (!wxOn) {
+            wxRect.setEmpty();
+            return;
+        }
+        float right = lightButtons.isEmpty() ? CONTENT_R * k : topRects[3].left - 28 * k, icon = L_WX_ICON * k;
+        wxTitleBase = Math.round(L_TITLE_BASE * k);
+        wxTabBase = Math.round((L_TABBAR_TOP + L_TABBAR_H / 2) * k + Ui.halfCap(lTab));
+        wxTemp = HomeData.degrees(wx.temp);
+        wxTempX = Math.round(right - lWxTemp.measureText(wxTemp));
+        wxSymbol = Symbols.weather(wx.code, wx.isDay);
+        Symbols.warmWeather(getContext(), wxSymbol, icon);
+        float iconW = Symbols.width(getContext(), wxSymbol, icon), iconH = Symbols.height(getContext(), wxSymbol, icon);
+        wxIconX = wxTempX - L_WX_ICON_GAP * k - iconW / 2;
+        wxIconY = wxTitleBase - Ui.cap(lWxTemp) / 2;
+        // The second line, from the right: the high and low, then city · condition (the condition shortened if long).
+        wxRange = HomeData.highLow(wx, "  ");
+        wxRangeX = Math.round(right - lWxRange.measureText(wxRange));
+        String city = Prefs.city(), condition = HomeData.condition(wx.code, wx.isDay);
+        wxCity = city;
+        float cityW = lWxCity.measureText(city);
+        // The line stays inside the buttons' layer, narrow without the status icons (many top buttons push it left).
+        float line = Math.min(L_WX_LINE_W * k, statusWide ? right : right - (1920 - 1160 + 20) * k);
+        float room = line - (right - wxRangeX) - L_WX_RANGE_GAP * k - cityW;
+        fitPaint.set(lWxCondition);
+        wxCondition = TextUtils.ellipsize(city.isEmpty() || condition.isEmpty() ? condition : " · " + condition, fitPaint,
+                Math.max(0, room), TextUtils.TruncateAt.END).toString();
+        wxConditionX = Math.round(wxRangeX - L_WX_RANGE_GAP * k - lWxCondition.measureText(wxCondition));
+        wxCityX = Math.round(wxConditionX - cityW);
+        wxRect.set(Math.min(wxCityX, wxIconX - iconW / 2), wxIconY - iconH / 2, right, wxTabBase + lWxCity.descent());
+        snap(wxRect);
+    }
+
+    /** The header's weather, straight on the background in the title's colors, with its symbol in color. */
+    private void drawTopWeather(Canvas c) {
+        if (!wxOn) return;
+        int ink = tone(lInk, nInk);
+        lWxTemp.setColor(ink);
+        c.drawText(wxTemp, wxTempX, wxTitleBase, lWxTemp);
+        Symbols.drawWeather(getContext(), c, wxSymbol, wxIconX, wxIconY, L_WX_ICON * k, dark());
+        lWxCity.setColor(ink);
+        c.drawText(wxCity, wxCityX, wxTabBase, lWxCity);
+        lWxCondition.setColor(ink);
+        c.drawText(wxCondition, wxConditionX, wxTabBase, lWxCondition);
+        lWxRange.setColor(tone(lDim, nDim));
+        c.drawText(wxRange, wxRangeX, wxTabBase, lWxRange);
     }
 
     /** Wi-Fi/Ethernet, Bluetooth (when something is connected) and a USB drive, at the top left. */

@@ -175,6 +175,7 @@ The first values come from `config.properties`, created by the first build (Goog
 | `theme` | `auto` (dark from sunset to sunrise), `light` or `dark` | `auto` |
 | `look` | This fork (Google TV): `glass` (frosted glass) or `sharp` (flat panels, hairline borders, more contrast); *Home Settings* → *Look* | `glass` |
 | `text_size` | This fork (Google TV): `normal` or `large` (the home screen's smaller text, bigger and bolder); *Home Settings* → *Text size* | `normal` |
+| `top_buttons` | This fork (Google TV): the round buttons at the top right until you change them on the TV: `default`, `none`, or keys in order (`live`, `inputs`, `settings`, `recents`, `store`). The weather sits in that corner, left of any | `default` |
 | `updates` | This fork: `true` brings back *Home Settings* → *Updates* (it only says when upstream has a new version) | `false` |
 | `disable_assistant` | Also turn off Google Assistant | `false` |
 | `screensaver` | `false` keeps the TV's own screensaver: Free My TV then changes only the home screen and the promo apps (Google TV) | `true` |

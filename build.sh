@@ -188,6 +188,7 @@ final class Config {
     static final String THEME = "$(prop theme auto)";
     static final String LOOK = "$(prop look glass)";   // fork: glass or sharp
     static final String TEXT_SIZE = "$(prop text_size normal)";   // fork: normal or large
+    static final String TOP_BUTTONS = "$(prop top_buttons default | tr -d ' ')";   // fork: default, none, or keys
     static final String IMMICH_SERVER = "$(prop immich_server '')";
     static final String HA_URL = "$(prop home_assistant_url '')";
     static final String HA_ENTITIES = "$(prop home_assistant_entities '')";

@@ -57,6 +57,11 @@ final class Symbols {
         return b == null ? 0 : b.getWidth() * pointSize / PX_PER_POINT;
     }
 
+    static float height(Context c, String name, float pointSize) {
+        Bitmap b = get(c, name);
+        return b == null ? 0 : b.getHeight() * pointSize / PX_PER_POINT;
+    }
+
     /** The point size that draws the symbol's bitmap at the given height. */
     static float pointSizeForHeight(Context c, String name, float height) {
         Bitmap b = get(c, name);
@@ -111,6 +116,49 @@ final class Symbols {
         float fw = b.getWidth() * pointSize / PX_PER_POINT, fh = b.getHeight() * pointSize / PX_PER_POINT;
         RECT.set(cx - fw / 2, cy - fh / 2, cx + fw / 2, cy + fh / 2);
         canvas.drawBitmap(s, null, RECT, PAINT);
+    }
+
+    // Weather colors, like Apple's Weather: {on light glass, on dark glass}.
+    private static final int[] SUN = {0xFFF5A300, 0xFFFFCC33}, MOON = {0xFF6E73C8, 0xFFDCDDF5}, CLOUD = {0xFF8C97A8, 0xFFDDE3EC},
+            RAIN = {0xFF2F8CFF, 0xFF5AB0FF}, SNOW = {0xFF4FA8E8, 0xFFA9DBFF}, BOLT = {0xFFF5B800, 0xFFFFD43B};
+
+    /**
+     * A weather symbol in color (the fork's header weather): the sun amber, the moon pale, clouds gray, rain and snow
+     * blue, lightning yellow. Two-part symbols are drawn from their NAME_cloud and NAME_accent PNGs
+     * (tools/make_symbols.py). `dark`: 0 = on a light background, 1 = on a dark one (in between during the transition).
+     */
+    static void drawWeather(Context c, Canvas canvas, String name, float cx, float cy, float pointSize, float dark) {
+        switch (name) {
+            case "sunny": draw(c, canvas, name, cx, cy, pointSize, tone(SUN, dark)); break;
+            case "clear_night": draw(c, canvas, name, cx, cy, pointSize, tone(MOON, dark)); break;
+            case "snowflake": draw(c, canvas, name, cx, cy, pointSize, tone(SNOW, dark)); break;
+            case "partly_cloudy_day": twoTone(c, canvas, name, cx, cy, pointSize, tone(SUN, dark), dark); break;
+            case "partly_cloudy_night": twoTone(c, canvas, name, cx, cy, pointSize, tone(MOON, dark), dark); break;
+            case "rainy": twoTone(c, canvas, name, cx, cy, pointSize, tone(RAIN, dark), dark); break;
+            case "thunderstorm": twoTone(c, canvas, name, cx, cy, pointSize, tone(BOLT, dark), dark); break;
+            default: draw(c, canvas, name, cx, cy, pointSize, tone(CLOUD, dark)); break;   // cloud, foggy
+        }
+    }
+
+    private static void twoTone(Context c, Canvas canvas, String name, float cx, float cy, float pointSize, int color, float dark) {
+        draw(c, canvas, name + "_cloud", cx, cy, pointSize, tone(CLOUD, dark));
+        draw(c, canvas, name + "_accent", cx, cy, pointSize, color);
+    }
+
+    /** Scales ahead of time every part drawWeather draws for `name`. */
+    static void warmWeather(Context c, String name, float pointSize) {
+        warm(c, name, pointSize);
+        warm(c, name + "_cloud", pointSize);   // missing for one-part symbols: nothing to scale
+        warm(c, name + "_accent", pointSize);
+    }
+
+    private static int tone(int[] pair, float dark) {
+        int a = pair[0], b = pair[1];
+        float f = Math.max(0, Math.min(1, dark));
+        int r = Math.round(((a >> 16) & 255) + (((b >> 16) & 255) - ((a >> 16) & 255)) * f);
+        int g = Math.round(((a >> 8) & 255) + (((b >> 8) & 255) - ((a >> 8) & 255)) * f);
+        int bl = Math.round((a & 255) + ((b & 255) - (a & 255)) * f);
+        return 0xFF000000 | r << 16 | g << 8 | bl;
     }
 
     /** Every symbol weather() returns, warmed at `pointSize` (the card shows whichever the forecast brings). */
