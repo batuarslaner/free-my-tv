@@ -3,8 +3,20 @@
 # Needs a JDK (17+) and the Android SDK command-line tools (build-tools 34+, platform android-34). See README.md.
 #   ./build.sh             with config.properties (your city, your TMDB key)
 #   ./build.sh --generic   without it, as the APK on GitHub's releases: no key, and the TV's time zone gives the city
+#   ./build.sh --fairplay  AirPlay's FairPlay plugin (fairplay/, GPL-3.0), signed with the app's key
+#   ./build.sh --selftest  AirPlay's self-test, on a JDK alone
 set -euo pipefail
 cd "$(dirname "$0")"
+
+# --- ./build.sh --selftest [captureDir]: the AirPlay receiver's self-test, on a JDK 17 alone (no Android SDK)
+if [ "${1:-}" = "--selftest" ]; then
+  J="${JAVA_HOME:+$JAVA_HOME/bin/}"
+  rm -rf out/selftest && mkdir -p out/selftest
+  "${J}javac" -nowarn -encoding UTF-8 -d out/selftest \
+    $(find app/src/io/freemytv/airplay tools/airplay_selftest fairplay/test -name '*.java') \
+    $(find fairplay/src -name '*.java' ! -name FairPlayService.java)
+  exec "${J}java" -cp out/selftest SelfTest "${2:-}"
+fi
 GENERIC=false
 for arg in "$@"; do [ "$arg" = "--generic" ] && GENERIC=true; done
 
@@ -24,6 +36,47 @@ JAVAC="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
 JAVA="${JAVA_HOME:+$JAVA_HOME/bin/}java"
 KEYTOOL="${JAVA_HOME:+$JAVA_HOME/bin/}keytool"
 command -v "$JAVAC" >/dev/null 2>&1 || { echo "JDK not found. Install JDK 17 and set JAVA_HOME."; exit 1; }
+# On Windows javac separates paths with ";", and d8 and apksigner are .bat files. Git Bash can't start a .bat whose
+# path has a space (and the wrappers trip over a JAVA_HOME that has one), so there the jars inside them are run with the
+# JDK's java instead; on macOS and Linux the usual executables are used.
+CPSEP=:; BAT=; case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) CPSEP=";"; BAT=.bat ;; esac
+d8() {
+  if [ -n "$BAT" ]; then "$JAVA" -Xmx1024M -Xss1m -cp "$BT/lib/d8.jar" com.android.tools.r8.D8 "$@"
+  else "$BT/d8" "$@"; fi
+}
+apksigner() {
+  if [ -n "$BAT" ]; then "$JAVA" -jar "$BT/lib/apksigner.jar" "$@"
+  else "$BT/apksigner" "$@"; fi
+}
+# Signs out/<dir>/aligned.apk as $2: with your own key, or the release's (FREEMYTV_KEYSTORE, its password in
+# FREEMYTV_KEYSTORE_PASS). The FairPlay plugin is signed the same way: the app only talks to one signed with its key.
+sign() {
+  if [ -n "${FREEMYTV_KEYSTORE:-}" ]; then
+    [ -n "${FREEMYTV_KEYSTORE_PASS:-}" ] || { echo "FREEMYTV_KEYSTORE_PASS is empty"; exit 1; }
+    apksigner sign --ks "$FREEMYTV_KEYSTORE" --ks-pass env:FREEMYTV_KEYSTORE_PASS --key-pass env:FREEMYTV_KEYSTORE_PASS \
+      --out "$2" "$1"
+  else
+    apksigner sign --ks freemytv.keystore --ks-pass pass:freemytv --key-pass pass:freemytv --out "$2" "$1"
+  fi
+}
+
+# --- ./build.sh --fairplay: the GPL-3.0 FairPlay plugin for AirPlay (fairplay/), signed with the app's key
+if [ "${1:-}" = "--fairplay" ]; then
+  [ -n "${FREEMYTV_KEYSTORE:-}" ] || [ -f freemytv.keystore ] || { echo "Build the app first (./build.sh): the plugin is signed with its key."; exit 1; }
+  P=out/fairplay
+  rm -rf "$P" && mkdir -p "$P/classes"
+  "$BT/aapt2" link -o "$P/base.apk" -I "$AJ" --manifest fairplay/AndroidManifest.xml \
+    --min-sdk-version 26 --target-sdk-version 33
+  "$JAVAC" -nowarn -Xlint:-options -source 8 -target 8 -bootclasspath "$AJ$CPSEP$BT/core-lambda-stubs.jar" -classpath "$AJ" \
+    -encoding UTF-8 -d "$P/classes" $(find fairplay/src -name '*.java')
+  d8 --release --min-api 26 --lib "$AJ" --output "$P" $(find "$P/classes" -name '*.class')
+  if command -v zip >/dev/null; then (cd "$P" && zip -qj base.apk classes.dex)
+  else "${JAVA_HOME:+$JAVA_HOME/bin/}jar" -u -M -f "$P/base.apk" -C "$P" classes.dex; fi
+  "$BT/zipalign" -f -p 4 "$P/base.apk" "$P/aligned.apk"
+  sign "$P/aligned.apk" FreeMyTV-FairPlay.apk
+  echo "Built FreeMyTV-FairPlay.apk (GPL-3.0, source in fairplay/)"
+  exit 0
+fi
 
 # --- Settings: config.properties -> Config.java
 CONFIG=config.properties
@@ -212,18 +265,6 @@ EOF
     "$JAVA" out/FixAssets.java out/base.apk
     ;;
 esac
-# On Windows javac separates paths with ";", and d8 and apksigner are .bat files. Git Bash can't start a .bat whose
-# path has a space (and the wrappers trip over a JAVA_HOME that has one), so there the jars inside them are run with the
-# JDK's java instead; on macOS and Linux the usual executables are used.
-CPSEP=:; BAT=; case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) CPSEP=";"; BAT=.bat ;; esac
-d8() {
-  if [ -n "$BAT" ]; then "$JAVA" -Xmx1024M -Xss1m -cp "$BT/lib/d8.jar" com.android.tools.r8.D8 "$@"
-  else "$BT/d8" "$@"; fi
-}
-apksigner() {
-  if [ -n "$BAT" ]; then "$JAVA" -jar "$BT/lib/apksigner.jar" "$@"
-  else "$BT/apksigner" "$@"; fi
-}
 "$JAVAC" -nowarn -Xlint:-options -source 8 -target 8 -bootclasspath "$AJ$CPSEP$BT/core-lambda-stubs.jar" -classpath "$AJ" \
   -encoding UTF-8 -d out/classes $(find app/src out/gen -name '*.java')
 d8 --release --min-api 26 --lib "$AJ" --output out $(find out/classes -name '*.class')
@@ -233,15 +274,9 @@ else "${JAVA_HOME:+$JAVA_HOME/bin/}jar" -u -M -f out/base.apk -C out classes.dex
 
 # --- Sign with your own key (created once; updates need the same key, so keep freemytv.keystore).
 # Releases sign with the project's key instead: FREEMYTV_KEYSTORE=<its file>, its password in FREEMYTV_KEYSTORE_PASS.
-if [ -n "${FREEMYTV_KEYSTORE:-}" ]; then
-  [ -n "${FREEMYTV_KEYSTORE_PASS:-}" ] || { echo "FREEMYTV_KEYSTORE_PASS is empty"; exit 1; }
-  apksigner sign --ks "$FREEMYTV_KEYSTORE" --ks-pass env:FREEMYTV_KEYSTORE_PASS --key-pass env:FREEMYTV_KEYSTORE_PASS \
-    --out FreeMyTV.apk out/aligned.apk
-else
-  if [ ! -f freemytv.keystore ]; then
-    "$KEYTOOL" -genkeypair -keystore freemytv.keystore -alias freemytv -keyalg RSA -keysize 2048 -validity 20000 \
-      -storepass freemytv -keypass freemytv -dname "CN=Free My TV" >/dev/null 2>&1
-  fi
-  apksigner sign --ks freemytv.keystore --ks-pass pass:freemytv --key-pass pass:freemytv --out FreeMyTV.apk out/aligned.apk
+if [ -z "${FREEMYTV_KEYSTORE:-}" ] && [ ! -f freemytv.keystore ]; then
+  "$KEYTOOL" -genkeypair -keystore freemytv.keystore -alias freemytv -keyalg RSA -keysize 2048 -validity 20000 \
+    -storepass freemytv -keypass freemytv -dname "CN=Free My TV" >/dev/null 2>&1
 fi
+sign out/aligned.apk FreeMyTV.apk
 echo "Built FreeMyTV.apk ($(du -h FreeMyTV.apk | cut -f1)). Install: adb install -r FreeMyTV.apk"

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Free My TV's FairPlay plugin (GPL-3.0, source here in fairplay/). No screen and no launcher icon: only Free My TV,
+     signed with the same key, can use it. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.freemytv.fairplay"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <!-- Defined here and in the app (either can be installed first); signature: only our own key gets it. -->
+    <permission
+        android:name="io.freemytv.permission.FAIRPLAY"
+        android:protectionLevel="signature" />
+
+    <queries>
+        <package android:name="io.freemytv" />
+    </queries>
+
+    <application
+        android:label="Free My TV FairPlay"
+        android:allowBackup="false"
+        android:hasCode="true">
+        <service
+            android:name=".FairPlayService"
+            android:exported="true"
+            android:permission="io.freemytv.permission.FAIRPLAY" />
+    </application>
+</manifest>

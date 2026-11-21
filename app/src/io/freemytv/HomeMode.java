@@ -31,7 +31,9 @@ import java.util.regex.Pattern;
  *
  * It all goes through the TV's own ADB (Adb, 127.0.0.1:5555), which you allow once on the TV. The switches run as
  * background jobs (ModeJob) in the main process; the settings screen (the :home process) asks for them and follows the
- * state file. Only the TV itself asks for switches: nothing here listens to the network.
+ * state file. Only the TV itself asks for switches: nothing here listens to the network. (AirPlay does, in Free My
+ * TV mode, from its own :airplay process; it never switches anything or runs shell commands. Here it is only started
+ * and stopped: AirPlay.resume and AirPlay.stop.)
  */
 final class HomeMode {
     private HomeMode() {}
@@ -682,6 +684,7 @@ final class HomeMode {
             notice(c, Capabilities.screensaver(c)
                     ? Ui.trf("Free My TV is on: new home screen and screensaver, {n} apps turned off.", "n", disabled.size())
                     : Ui.trf("Free My TV is on: new home screen, {n} apps turned off.", "n", disabled.size()));
+            AirPlay.resume(c);   // never throws
             busy(c, Ui.tr("Measuring Free My TV…"));
             measure(c, adb, FREE, false);
             done(c, null);
@@ -753,6 +756,7 @@ final class HomeMode {
             s.put("mode", ORIGINAL).put("since", System.currentTimeMillis()).put("homeReverted", false)
                     .put("disabled", new JSONArray(failed)).remove("keptOff");
             save(c, s);
+            AirPlay.stop(c);   // after the mode is saved: nothing starts it again
             if (failed.isEmpty() && homeOk) {
                 notice(c, Ui.tr("Original mode: the factory home screen, screensaver and apps are back."));
             } else {

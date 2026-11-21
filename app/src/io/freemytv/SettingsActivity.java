@@ -188,6 +188,9 @@ public class SettingsActivity extends Activity {
         private String choiceNow = "";
         private final List<String[]> cities = new ArrayList<>();
         private String cityStatus = "";
+        /** AirPlay, read when Home Settings opens and after each change (files and the package manager, not every frame). */
+        private boolean airplayPlugin, airplayOn, airplayPaused;
+        private String airplayName = "", airplayCode = io.freemytv.airplay.Advert.CODE_OFF;
         private JSONObject updates = new JSONObject();   // Updates' file (the main process writes it), read in poll
         private long checkAskedAt, installAskedAt;       // OK on Updates, on the wall clock as the file's "at"
         private String installed = "";                   // this app's version (an update starts a new process)
@@ -1029,6 +1032,7 @@ public class SettingsActivity extends Activity {
             l.add("Ethereum");
             l.add("Solana");
             if (dollar()) l.add(Ui.tr("Dollar"));
+            for (int id : forkRows()) l.add(forkLabel(id));
             l.add(Ui.tr("TMDB key"));
             l.add(Ui.tr("Watchmode key"));
             if (Config.UPDATES) l.add(Ui.tr("Updates"));   // fork: only with updates=true
@@ -1136,8 +1140,10 @@ public class SettingsActivity extends Activity {
             if (HOME_ROW >= 0) v[HOME_ROW] = onOff(HomeAssistant.on(getContext()));
             v[QUOTES_ROW] = onOff(Prefs.quotes());
             // No quotes widget, nowhere to show prices: the coins read as off (and stay locked) until it is back on.
-            int keys = keyRow();
-            for (int i = COIN_ROWS; i < keys; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
+            int keys = keyRow(), fork = forkStart();
+            for (int i = COIN_ROWS; i < fork; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
+            List<Integer> forkIds = forkRows();
+            for (int i = 0; i < forkIds.size(); i++) v[fork + i] = forkValue(forkIds.get(i));
             v[keys] = keyValue(Recs.key());
             v[keys + 1] = keyValue(Recs.watchmodeKey());
             if (Config.UPDATES) v[keys + 2] = updatesValue();
@@ -1183,7 +1189,8 @@ public class SettingsActivity extends Activity {
                             : pickScroll + i == HOME_ROW ? Capabilities.NEED_HOME_ASSISTANT
                             : pickScroll + i == POWER_ON_ROW ? Capabilities.NEED_LIVE_TV
                             : pickScroll + i == LIVE_BUTTON_ROW ? Capabilities.NEED_HDMI
-                            : pickScroll + i == SAVER_ROW ? Capabilities.NEED_SCREENSAVER : null;
+                            : pickScroll + i == SAVER_ROW ? Capabilities.NEED_SCREENSAVER
+                            : forkRow(pickScroll + i) == F_AIRPLAY ? Capabilities.NEED_FAIRPLAY : null;
                 case POWER: {
                     int id = powerRows()[i];
                     return id == P_WHERE ? Capabilities.NEED_OVERLAY : null;
@@ -1209,7 +1216,7 @@ public class SettingsActivity extends Activity {
                 whyScroll = pickScroll;
                 for (int r = 0; r < n; r++) {
                     String need = need(r);
-                    whyRows[r] = screen == HOME_SETTINGS && pickScroll + r >= COIN_ROWS && pickScroll + r < keyRow() && !Prefs.quotes()
+                    whyRows[r] = screen == HOME_SETTINGS && pickScroll + r >= COIN_ROWS && pickScroll + r < forkStart() && !Prefs.quotes()
                             ? Ui.tr("Turn on the Quotes widget to pick its coins.")
                             : need == null ? null : Capabilities.missing(getContext(), need);
                 }
@@ -1543,6 +1550,10 @@ public class SettingsActivity extends Activity {
                     return;
                 case QUOTES_ROW: Prefs.setQuotes(!Prefs.quotes()); break;
                 default:
+                    if (forkRow(row) >= 0) {
+                        adjustFork(forkRow(row), dir);
+                        return;
+                    }
                     if (row >= keyRow() || !Prefs.quotes()) return;   // the keys and Updates act on OK only
                     Prefs.setCoin(row - COIN_ROWS, !Prefs.coin(row - COIN_ROWS));
                     break;
@@ -1568,6 +1579,117 @@ public class SettingsActivity extends Activity {
                 return true;
             });
             dialog.show();
+        }
+
+        // MARK: - The fork's rows: after the coins, before the keys (upstream's rows keep their numbers)
+
+        /** AirPlay, then its name and code (with the FairPlay plugin). */
+        private static final int F_AIRPLAY = 0, F_AIRPLAY_NAME = 1, F_AIRPLAY_CODE = 2;
+
+        private List<Integer> forkRows() {
+            List<Integer> rows = new ArrayList<>();
+            rows.add(F_AIRPLAY);
+            if (airplayPlugin) {
+                rows.add(F_AIRPLAY_NAME);
+                rows.add(F_AIRPLAY_CODE);
+            }
+            return rows;
+        }
+
+        /** The Home Settings index of the first fork row. */
+        private int forkStart() {
+            return keyRow() - forkRows().size();
+        }
+
+        /** The fork row at Home Settings index `row` (F_…), or -1. */
+        private int forkRow(int row) {
+            List<Integer> rows = forkRows();
+            int i = row - forkStart();
+            return i >= 0 && i < rows.size() ? rows.get(i) : -1;
+        }
+
+        private String forkLabel(int id) {
+            switch (id) {
+                case F_AIRPLAY_NAME: return Ui.tr("AirPlay name");
+                case F_AIRPLAY_CODE: return Ui.tr("AirPlay code");
+                default: return "AirPlay";
+            }
+        }
+
+        private String forkValue(int id) {
+            switch (id) {
+                case F_AIRPLAY_NAME: return airplayName;
+                case F_AIRPLAY_CODE:
+                    return io.freemytv.airplay.Advert.CODE_FIRST.equals(airplayCode) ? Ui.tr("airplay|First time")
+                            : io.freemytv.airplay.Advert.CODE_ALWAYS.equals(airplayCode) ? Ui.tr("airplay|Always") : onOff(false);
+                default:
+                    // Without the plugin the row is Unavailable (Capabilities.NEED_FAIRPLAY says why).
+                    return airplayPlugin && airplayOn && airplayPaused ? Ui.tr("Paused after errors") : onOff(airplayPlugin && airplayOn);
+            }
+        }
+
+        private void adjustFork(int id, int dir) {
+            Context c = getContext();
+            switch (id) {
+                case F_AIRPLAY: {
+                    if (!airplayPlugin) return;
+                    // On again after a crash pause: the pause ends (as when Free My TV mode is turned on again).
+                    boolean on = !airplayOn || airplayPaused;
+                    AirPlay.putSetting(c, "enabled", String.valueOf(on));
+                    if (on) AirPlay.resume(c);
+                    else AirPlay.stop(c);
+                    break;
+                }
+                case F_AIRPLAY_CODE: {
+                    String[] codes = {io.freemytv.airplay.Advert.CODE_OFF, io.freemytv.airplay.Advert.CODE_FIRST,
+                            io.freemytv.airplay.Advert.CODE_ALWAYS};
+                    int at = java.util.Arrays.asList(codes).indexOf(airplayCode);
+                    AirPlay.putSetting(c, "code", codes[(at + dir + codes.length) % codes.length]);
+                    AirPlay.reload(c);
+                    break;
+                }
+                default: return;   // the name: OK opens its dialog
+            }
+            readAirPlay();
+        }
+
+        private void readAirPlay() {
+            Context c = getContext();
+            airplayPlugin = AirPlay.pluginInstalled(c);
+            airplayOn = AirPlay.enabled(c);
+            airplayPaused = AirPlay.paused(c);
+            airplayName = AirPlay.name(c);
+            airplayCode = AirPlay.code(c);
+        }
+
+        /** The name iPhones list: typed here, or empty for the TV's own name + " AirPlay". */
+        private void askAirPlayName() {
+            EditText field = new EditText(activity);
+            field.setSingleLine(true);
+            field.setText(AirPlay.customName(getContext()));
+            field.setHint(Ui.tr("Empty: the TV's name"));
+            field.setImeOptions(EditorInfo.IME_ACTION_DONE);
+            AlertDialog dialog = new AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                    .setTitle(Ui.tr("AirPlay name"))
+                    .setView(field)
+                    .setPositiveButton(Ui.tr("Save"), (d, which) -> saveAirPlayName(field.getText().toString()))
+                    .setNegativeButton(Ui.tr("Cancel"), null)
+                    .create();
+            field.setOnEditorActionListener((v, action, event) -> {
+                dialog.dismiss();
+                saveAirPlayName(field.getText().toString());
+                return true;
+            });
+            dialog.show();
+        }
+
+        private void saveAirPlayName(String name) {
+            String clean = name.trim().isEmpty() ? "" : io.freemytv.airplay.Advert.safeName(name);
+            if (clean.equals(AirPlay.customName(getContext()))) return;
+            AirPlay.putSetting(getContext(), "name", clean);
+            AirPlay.reload(getContext());
+            readAirPlay();
+            invalidate();
         }
 
         // MARK: - Updates (GitHub's releases)
@@ -2540,6 +2662,9 @@ public class SettingsActivity extends Activity {
             } else if (screen == HOME_SETTINGS && pickScroll + focus == updatesRow()) {
                 updateNow();
                 return;
+            } else if (screen == HOME_SETTINGS && forkRow(pickScroll + focus) == F_AIRPLAY_NAME) {
+                askAirPlayName();
+                return;
             } else if (screen == HOME_SETTINGS && (pickScroll + focus == keyRow() || pickScroll + focus == watchmodeRow())) {
                 openKeyScreen(pickScroll + focus == watchmodeRow());
             } else if (screen == TMDB_KEY) {
@@ -2584,6 +2709,7 @@ public class SettingsActivity extends Activity {
                 pause();
                 activity.showPreview();
             } else if (focus == 2) {
+                readAirPlay();
                 screen = HOME_SETTINGS;
                 focus = 0;
                 pickScroll = 0;

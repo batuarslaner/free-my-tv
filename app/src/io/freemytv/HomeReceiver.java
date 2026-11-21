@@ -14,10 +14,12 @@ public class HomeReceiver extends BroadcastReceiver {
         if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
             HomeMode.bootCheck(context);
             Updates.schedule(context);
+            AirPlay.ensure(context);   // these two broadcasts may start a foreground service from the background
         } else if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
             HomeMode.verify(context);   // app updated: complete Free My TV mode if something is missing
             HomeMode.ensureRemoteService(context, 3_000);
             Updates.schedule(context);
+            AirPlay.ensure(context);
             later(() -> Updates.cleanUp(context));
         } else if (Updates.ACTION.equals(action)) {
             later(() -> Updates.status(context, intent));

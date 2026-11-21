@@ -22,7 +22,7 @@ import java.nio.charset.StandardCharsets;
 public class ModeJob extends JobService {
     static final String APPLY = "apply", VERIFY = "verify", REVERT = "revert", MEMORY = "memory", REMOTE = "remote",
             PLAYING = "playing", UPDATE = "update", INSTALL = "install", GRANT_WATCH = "watchGrant",
-            REVOKE_WATCH = "watchRevoke", POWER_ON = "powerOn";   // job ids come from these names: keep them apart
+            REVOKE_WATCH = "watchRevoke", POWER_ON = "powerOn", NOTICE = "notice";   // job ids come from these names: keep them apart
 
     @Override public boolean onStartJob(JobParameters params) {
         PersistableBundle extras = params.getExtras();
@@ -46,6 +46,7 @@ public class ModeJob extends JobService {
                     case GRANT_WATCH: HomeMode.grantWatchNow(app); break;
                     case REVOKE_WATCH: HomeMode.revokeWatchNow(app); break;
                     case POWER_ON: HomeMode.powerOnNow(app); break;
+                    case NOTICE: HomeMode.notice(app, extras.getString("text", "")); break;
                     default: break;
                 }
             } catch (Throwable t) {
@@ -75,10 +76,20 @@ public class ModeJob extends JobService {
      * (elapsedRealtime, the same in every process), which a switch's job leaves behind once it runs ({@link #started}).
      */
     static long schedule(Context c, String action, String mode, long delayMs) {
+        return schedule(c, action, mode, delayMs, new PersistableBundle());
+    }
+
+    /** A notice from another process (:airplay): only the main process writes the state file. */
+    static void notice(Context c, String text) {
+        PersistableBundle extras = new PersistableBundle();
+        extras.putString("text", text);
+        schedule(c, NOTICE, null, 0, extras);
+    }
+
+    private static long schedule(Context c, String action, String mode, long delayMs, PersistableBundle extras) {
         long at = SystemClock.elapsedRealtime();
         JobScheduler scheduler = c.getSystemService(JobScheduler.class);
         if (scheduler == null) return at;
-        PersistableBundle extras = new PersistableBundle();
         extras.putString("action", action);
         extras.putString("mode", mode == null ? "" : mode);
         extras.putLong("at", at);

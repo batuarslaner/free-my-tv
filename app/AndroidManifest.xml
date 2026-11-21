@@ -23,6 +23,15 @@
          granted at install; from 12 it is asked for when Status icons is turned on (and only the icon needs it). -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- AirPlay (AirPlayService): Bonjour announcements need multicast on Wi-Fi; the receiver is a foreground service. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Only apps signed with our key may use the FairPlay plugin (defined in both APKs: either can come first). -->
+    <permission
+        android:name="io.freemytv.permission.FAIRPLAY"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="io.freemytv.permission.FAIRPLAY" />
 
     <!-- Android 11+: without this list the app can't "see" the other apps (getLeanbackLaunchIntentForPackage
          returns null). The shelf and streaming apps, the live TV apps and, through the <intent>, every TV app
@@ -84,6 +93,8 @@
         <package android:name="com.amazon.tv.livetv" />
         <package android:name="com.amazon.tv.inputpreference.service" />
         <package android:name="com.amazon.mediatek.livetv" />
+        <!-- AirPlay's FairPlay plugin (fairplay/) -->
+        <package android:name="io.freemytv.fairplay" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
@@ -273,6 +284,26 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- AirPlay screen mirroring (Free My TV mode, with the FairPlay plugin). Its own process: it listens on the
+             network, and a crash there never reaches the home screen. At targetSdk 34 this needs
+             foregroundServiceType="connectedDevice" and the FOREGROUND_SERVICE_CONNECTED_DEVICE permission. -->
+        <service
+            android:name=".AirPlayService"
+            android:process=":airplay"
+            android:exported="false" />
+
+        <!-- The AirPlay player, with its service in :airplay. Opened by the service when a stream starts. -->
+        <activity
+            android:name=".AirPlayActivity"
+            android:process=":airplay"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="io.freemytv.airplay"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+            android:theme="@style/FreeMyTV.Player" />
 
         <receiver
             android:name=".HomeReceiver"

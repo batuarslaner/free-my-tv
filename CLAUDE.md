@@ -36,6 +36,8 @@ before you do it, and let them do the taps on the TV.
   *Original* can bring it back.
 - Don't change the TV's picture, sound, network or account settings.
 - Keep the way back working: the *Original* mode and the watchdog.
+- AirPlay (this fork) listens to the network: the `:airplay` process never reaches `Adb`, `HomeMode.apply*` or
+  anything that runs shell commands; *Original* stops it.
 
 ## Installing it for someone
 
@@ -114,6 +116,11 @@ before you do it, and let them do the taps on the TV.
    `mPerId=` holds every user's, which `forget-network` can't reach), and a Passpoint profile's block has one too
    (#411).
 9. **Check:** `adb logcat -s FreeMyTV` shows what the switch did.
+10. **AirPlay (this fork, optional, iPhone/iPad mirroring):** `./build.sh --fairplay` makes `FreeMyTV-FairPlay.apk`
+    (GPL-3.0, signed with the same key as the app; the app must be built first); `adb install -r FreeMyTV-FairPlay.apk`.
+    It runs in Free My TV mode; on the iPhone, Control Center → *Screen Mirroring* → the TV. *Home Settings* has
+    *AirPlay* (on/off), *AirPlay name* and *AirPlay code*. `adb logcat -s FreeMyTV | grep airplay` shows it working
+    (`airplay: self-check ok`, `plugin 1 ok`, `advertising "…" on 7000`).
 
 ## Installing it on an LG TV (webOS)
 
@@ -652,6 +659,15 @@ entries; its system pieces are in `PROTECTED`. USB debugging opens ADB on 5555 t
   watchdog's revert stop it; `adb shell pgrep -f 'freemytv-wak[e]'` shows it. Leave `cleanmaster` on: the loop doesn't
   need it off.
 - After any change, `./build.sh` must end with `Built FreeMyTV.apk`.
+- AirPlay (this fork): `io.freemytv.airplay` is plain Java with no `android.*` (it also compiles on a JDK alone, for
+  `./build.sh --selftest`, which must end with `SelfTest: all N checks passed`); the Android side is `AirPlay*` in
+  `io.freemytv`, in its own `:airplay` process (service, player, decoder, sound). FairPlay is only in `fairplay/`
+  (GPL-3.0, its own APK, `./build.sh --fairplay`), reached through a raw Binder (`FairPlayClient`); `app/` holds no
+  FairPlay or PlayFair code, only a SHA-256 to check the plugin. The log never shows keys (only
+  `Bytes.fingerprint`), the identity in `files/airplay-id.txt` or the AirPlay code. Settings: `files/airplay.txt`
+  (written by the settings screen, `AirPlay.reload` tells `:airplay`); its Home Settings rows are the fork's, after
+  the coins and before the keys (`SettingsActivity.forkRows`), so upstream's row numbers stay as they are.
+  The fork has no self-updates: `Updates` does nothing unless `updates=true` (`Config.UPDATES`).
 - LG and Samsung (`web/`): plain ES5 JavaScript and CSS without variables, grid or backdrop-filter, since older TVs
   (webOS 3 and 4, Tizen 3) run a Chromium from 2015 to 2017 (`tools/check.sh` greps for all of these); only transform
   and opacity animate. Tizen 2.4 (2016) runs WebKit 538: no Intl (`fmt` in data.js rounds by hand), SVGs need a width

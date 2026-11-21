@@ -96,6 +96,7 @@ public class HomeActivity extends Activity {
         // Android then keeps the app just left visible, and home tasks are layered under all others, so that app stays
         // on screen over ours. Opaque again on every resume (setTranslucent is public from Android 11).
         if (RemoteKeys.TCL && Build.VERSION.SDK_INT >= 30) setTranslucent(false);
+        AirPlay.ensureOften(this);   // while we're visible, Android lets us start its foreground service
         if (prefsVersion != Prefs.version) {
             prefsVersion = Prefs.version;
             HomeData.get(this).settingsChanged();
