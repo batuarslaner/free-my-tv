@@ -173,6 +173,9 @@ The first values come from `config.properties`, created by the first build (Goog
 | `currency` | Crypto prices in `USD`, `EUR`, `BRL`… | `USD` |
 | `temperature` | `C`, `F` or `auto` | `auto` |
 | `theme` | `auto` (dark from sunset to sunrise), `light` or `dark` | `auto` |
+| `look` | This fork (Google TV): `glass` (frosted glass) or `sharp` (flat panels, hairline borders, more contrast); *Home Settings* → *Look* | `glass` |
+| `text_size` | This fork (Google TV): `normal` or `large` (the home screen's smaller text, bigger and bolder); *Home Settings* → *Text size* | `normal` |
+| `updates` | This fork: `true` brings back *Home Settings* → *Updates* (it only says when upstream has a new version) | `false` |
 | `disable_assistant` | Also turn off Google Assistant | `false` |
 | `screensaver` | `false` keeps the TV's own screensaver: Free My TV then changes only the home screen and the promo apps (Google TV) | `true` |
 | `hide_services` | Streaming services to leave out of the picks even when their app is on the TV (`netflix`, `prime`, `disney`…), comma separated; for apps the TV ships that you don't subscribe to. On Google TV and Android TV, a service that TMDB lists in your country under the same name as an app on the TV also appears in *Picks from*, off until you switch it on. It is where the switches in Home Settings › Picks › Picks from start (Home Settings › Picks from on LG and Samsung); what you switch on the TV wins | empty |

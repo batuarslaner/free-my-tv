@@ -313,6 +313,24 @@ final class Prefs {
     static boolean saverWatch() { return sp().getBoolean("saverWatch", false); }
     static void setSaverWatch(boolean on) { put("saverWatch", on); }
 
+    // MARK: - Look and text size (fork)
+
+    /** "glass" (frosted glass) or "sharp" (flat panels, hairline borders, more contrast); config.properties' look. */
+    static String look() {
+        String v = sp().getString("look", Config.LOOK).trim().toLowerCase(Locale.ROOT);
+        return v.equals("sharp") ? "sharp" : "glass";
+    }
+
+    static void setLook(String v) { put("look", v); }
+
+    /** "normal" or "large" (the home screen's smaller text, bigger and a little bolder); config.properties' text_size. */
+    static String textSize() {
+        String v = sp().getString("textSize", Config.TEXT_SIZE).trim().toLowerCase(Locale.ROOT);
+        return v.equals("large") ? "large" : "normal";
+    }
+
+    static void setTextSize(String v) { put("textSize", v); }
+
     // MARK: - Top of the home screen
 
     static final String TOP_PICKS = "picks", TOP_CONTINUE = "continue", TOP_NONE = "none";

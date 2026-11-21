@@ -186,6 +186,8 @@ final class Config {
     static final String TEMPERATURE = "$(prop temperature auto)";
     static final String HIDE_SERVICES = "$(prop hide_services '')";
     static final String THEME = "$(prop theme auto)";
+    static final String LOOK = "$(prop look glass)";   // fork: glass or sharp
+    static final String TEXT_SIZE = "$(prop text_size normal)";   // fork: normal or large
     static final String IMMICH_SERVER = "$(prop immich_server '')";
     static final String HA_URL = "$(prop home_assistant_url '')";
     static final String HA_ENTITIES = "$(prop home_assistant_entities '')";

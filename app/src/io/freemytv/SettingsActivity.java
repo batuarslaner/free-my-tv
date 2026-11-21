@@ -473,7 +473,7 @@ public class SettingsActivity extends Activity {
             rowValue = Ui.text(Ui.regular, 28 * k, 0x8CFFFFFF);
             rowValue.setTextAlign(Paint.Align.RIGHT);
             rowValueFit = new TextPaint(rowValue);
-            rowSub = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
+            rowSub = hint();
             header = Ui.text(Ui.semibold, 21 * k, 0x73FFFFFF);
             header.setLetterSpacing(0.06f);
             cellLabel = Ui.text(Ui.regular, 25 * k, 0xD9FFFFFF);
@@ -769,7 +769,7 @@ public class SettingsActivity extends Activity {
                     Symbols.draw(getContext(), c, "check", rowRect.right - 30 * k - cw / 2, rowRect.centerY(), 26 * k, blend(0xFFFFFFFF, INK, f));
                 }
             }
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
+            Paint hint = hint();
             c.drawText(Ui.tr("Switching takes a few seconds; the screen blinks while it measures."), LIST_X * k + 30 * k,
                     (LIST_TOP + 20 + 2 * (CHOICE_H + ROW_GAP) + 40) * k, hint);
         }
@@ -1334,6 +1334,12 @@ public class SettingsActivity extends Activity {
             return screen == REMOTE_KEYS ? keyValues() : screen == POWER ? powerValues() : screen == PICKS ? picksValues() : settingValues();
         }
 
+        /** The hint lines under the lists (the fork's Text size: Large makes them bigger and a little bolder). */
+        private Paint hint() {
+            boolean large = Prefs.textSize().equals("large");
+            return Ui.text(large ? Ui.medium : Ui.regular, 23 * k * (large ? 1.13f : 1), 0x8CFFFFFF);
+        }
+
         private static String onOff(boolean on) {
             return on ? Ui.tr("On") : Ui.tr("Off");
         }
@@ -1583,11 +1589,13 @@ public class SettingsActivity extends Activity {
 
         // MARK: - The fork's rows: after the coins, before the keys (upstream's rows keep their numbers)
 
-        /** AirPlay, then its name and code (with the FairPlay plugin). */
-        private static final int F_AIRPLAY = 0, F_AIRPLAY_NAME = 1, F_AIRPLAY_CODE = 2;
+        /** Look and Text size, then AirPlay and its name and code (with the FairPlay plugin). */
+        private static final int F_AIRPLAY = 0, F_AIRPLAY_NAME = 1, F_AIRPLAY_CODE = 2, F_LOOK = 3, F_TEXT_SIZE = 4;
 
         private List<Integer> forkRows() {
             List<Integer> rows = new ArrayList<>();
+            rows.add(F_LOOK);
+            rows.add(F_TEXT_SIZE);
             rows.add(F_AIRPLAY);
             if (airplayPlugin) {
                 rows.add(F_AIRPLAY_NAME);
@@ -1610,6 +1618,8 @@ public class SettingsActivity extends Activity {
 
         private String forkLabel(int id) {
             switch (id) {
+                case F_LOOK: return Ui.tr("Look");
+                case F_TEXT_SIZE: return Ui.tr("Text size");
                 case F_AIRPLAY_NAME: return Ui.tr("AirPlay name");
                 case F_AIRPLAY_CODE: return Ui.tr("AirPlay code");
                 default: return "AirPlay";
@@ -1618,6 +1628,8 @@ public class SettingsActivity extends Activity {
 
         private String forkValue(int id) {
             switch (id) {
+                case F_LOOK: return Prefs.look().equals("sharp") ? Ui.tr("look|Sharp") : Ui.tr("look|Glass");
+                case F_TEXT_SIZE: return Prefs.textSize().equals("large") ? Ui.tr("text|Large") : Ui.tr("text|Normal");
                 case F_AIRPLAY_NAME: return airplayName;
                 case F_AIRPLAY_CODE:
                     return io.freemytv.airplay.Advert.CODE_FIRST.equals(airplayCode) ? Ui.tr("airplay|First time")
@@ -1631,6 +1643,9 @@ public class SettingsActivity extends Activity {
         private void adjustFork(int id, int dir) {
             Context c = getContext();
             switch (id) {
+                // Two values each, so either arrow switches; the home screen draws itself again (Prefs.version).
+                case F_LOOK: Prefs.setLook(Prefs.look().equals("sharp") ? "glass" : "sharp"); return;
+                case F_TEXT_SIZE: Prefs.setTextSize(Prefs.textSize().equals("large") ? "normal" : "large"); return;
                 case F_AIRPLAY: {
                     if (!airplayPlugin) return;
                     // On again after a crash pause: the pause ends (as when Free My TV mode is turned on again).
@@ -2236,7 +2251,7 @@ public class SettingsActivity extends Activity {
             Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
             c.drawText(Ui.tr("Continue Watching apps"),
                     LIST_X * k + 30 * k, (LIST_TOP - 24) * k, heading);
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
+            Paint hint = hint();
             if (watchApps == null || watchApps.isEmpty() && watchHiddenCount == 0) {
                 c.drawText(watchApps == null ? Ui.tr("Looking for the apps…")
                         : Ui.tr("No app on this TV shares what you watch."), LIST_X * k + 30 * k, (LIST_TOP + 56) * k, hint);
@@ -2418,7 +2433,7 @@ public class SettingsActivity extends Activity {
                 }
                 c.drawText(off ? Ui.tr("Unavailable") : place >= 0 ? "#" + (place + 1) : Ui.tr("shelf|Off"), right, base, rowValue);
             }
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
+            Paint hint = hint();
             float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
             if (!editingTop && !editingInputs && HomeApps.lowRam(getContext())) {
                 c.drawText(Ui.tr("This TV has little memory, so the shelf holds fewer apps."), LIST_X * k + 30 * k, hy + 38 * k, hint);
@@ -2490,7 +2505,7 @@ public class SettingsActivity extends Activity {
                     Symbols.draw(getContext(), c, "check", rowRect.right - 30 * k - cw / 2, rowRect.centerY(), 26 * k, blend(0xFFFFFFFF, INK, f));
                 }
             }
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
+            Paint hint = hint();
             float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
             c.drawText((pickScroll + focus + 1) + " / " + pickLabels.size() + "  ·  " + Ui.tr("OK picks, Back cancels."),
                     LIST_X * k + 30 * k, hy, hint);
@@ -2525,7 +2540,7 @@ public class SettingsActivity extends Activity {
                 c.drawText(service[1], rowRect.left + 30 * k, base, rowLabel);
                 c.drawText(onOff(!Prefs.serviceOff(service[0])), rowRect.right - 30 * k, base, rowValue);
             }
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
+            Paint hint = hint();
             float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
             c.drawText(services.isEmpty() ? Ui.tr("No streaming apps on this TV.")
                     : Ui.tr("Titles from a service that is off are left out of the picks."),
@@ -2565,7 +2580,7 @@ public class SettingsActivity extends Activity {
                 c.drawText(TextUtils.ellipsize(values[from + i], rowValueFit, room, TextUtils.TruncateAt.END).toString(),
                         right, base, rowValue);
             }
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
+            Paint hint = hint();
             float hy = (LIST_TOP + 20 + rows * pitch + 36) * k;
             // A list longer than the screen says where we are in it, as the app picker does. Photos say where they come
             // from; on the Sleep Timer screen, the timer and Position open a list on OK.

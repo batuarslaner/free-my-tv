@@ -49,7 +49,7 @@ public class AirPlayActivity extends Activity implements SurfaceHolder.Callback 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         Ui.init(this);
-        float textScale = 1f;
+        float textScale = "large".equals(Prefs.textSize()) ? 1.2f : 1f;
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
         view = new SurfaceView(this);
