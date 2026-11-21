@@ -6,6 +6,9 @@ config.properties
 webos-apps.local.json
 webos-icons.local/
 
+# Fork: the streaming apps' logos (trademarks), fetched by tools/logos.py when building
+app/assets/logos/
+
 # Build output
 out/
 *.apk

@@ -176,6 +176,8 @@ The first values come from `config.properties`, created by the first build (Goog
 | `look` | This fork (Google TV): `glass` (frosted glass) or `sharp` (flat panels, hairline borders, more contrast); *Home Settings* → *Look* | `glass` |
 | `text_size` | This fork (Google TV): `normal` or `large` (the home screen's smaller text, bigger and bolder); *Home Settings* → *Text size* | `normal` |
 | `top_buttons` | This fork (Google TV): the round buttons at the top right until you change them on the TV: `default`, `none`, or keys in order (`live`, `inputs`, `settings`, `recents`, `store`). The weather sits in that corner, left of any | `default` |
+| `power_on` | This fork (Google TV): *At power-on* until you change it on the TV: `tv`, `home` or `live` (Live TV, also after a wake from standby) | `tv` |
+| `navigation_sounds` | This fork (Google TV): `false` starts with *Navigation sounds* off | `true` |
 | `updates` | This fork: `true` brings back *Home Settings* → *Updates* (it only says when upstream has a new version) | `false` |
 | `disable_assistant` | Also turn off Google Assistant | `false` |
 | `screensaver` | `false` keeps the TV's own screensaver: Free My TV then changes only the home screen and the promo apps (Google TV) | `true` |
@@ -407,7 +409,7 @@ No accounts, no analytics, no tracking. AirPlay (this fork) stays on your home n
 - This product uses the TMDB API but is not endorsed or certified by [TMDB](https://www.themoviedb.org/).
 - Links to the titles in the streaming apps by [Watchmode](https://api.watchmode.com/).
 - Weather data by [Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0). Prices from the [Binance](https://www.binance.com/) public API.
-- Icons: [Material Symbols](https://fonts.google.com/icons) (Apache 2.0). Font: [Inter](https://rsms.me/inter/) (SIL OFL 1.1). Coin logos: [cryptocurrency-icons](https://github.com/spothq/cryptocurrency-icons) (CC0). Samsung app logos: [Simple Icons](https://simpleicons.org) (CC0).
+- Icons: [Material Symbols](https://fonts.google.com/icons) (Apache 2.0). Font: [Inter](https://rsms.me/inter/) (SIL OFL 1.1). Coin logos: [cryptocurrency-icons](https://github.com/spothq/cryptocurrency-icons) (CC0). Samsung app logos: [Simple Icons](https://simpleicons.org) (CC0). In this fork, the Google TV shelf's app logos come from [Wikimedia Commons](https://commons.wikimedia.org/) when you build (`tools/logos.py`, needs `rsvg-convert`); they are not in the repository.
 - The QR code encoder follows Project Nayuki's [QR Code generator](https://www.nayuki.io/page/qr-code-generator-library) (MIT).
 - Not affiliated with Google, TCL, LG, Samsung or any streaming service. App names and logos belong to their owners.
 

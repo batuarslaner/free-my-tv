@@ -254,6 +254,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         TILE_STYLE.put("disney", new int[] {0xFF173584, 0xFF08143F, 0});
         TILE_STYLE.put("max", new int[] {0xFF5C30E8, 0xFF221684, 0});
         TILE_STYLE.put("appletv", new int[] {0xFF1C1C1E, 0xFF000000, 0});
+        TILE_STYLE.put("live", new int[] {0xFF2C3140, 0xFF10131B, 0});   // the fork's Live TV card: slate, white symbol
     }
     private final android.graphics.PorterDuffColorFilter whiteLogo =
             new android.graphics.PorterDuffColorFilter(0xFFFFFFFF, android.graphics.PorterDuff.Mode.SRC_IN);
@@ -3488,12 +3489,11 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         LOADER.execute(() -> {
             // On the shelf means shown there: installed and within the limit, as in Settings > Shelf.
             List<String> list = new ArrayList<>(HomeApps.shelfPackages(c));
-            PackageManager pm = c.getPackageManager();
             int max = HomeApps.maxShelf(c), shown = 0;
             boolean on = false;
             for (String p : list) {
                 if (shown >= max) break;
-                if (HomeApps.launchIntent(pm, p) == null) continue;
+                if (!HomeApps.shelfShows(c, p)) continue;
                 shown++;
                 on |= p.equals(it.pkg);
             }
@@ -3526,7 +3526,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         // "Last opened first" places the shelf's apps itself
         if (zone != Z_SHELF || shelfIndex >= shelf.size() || shelf.size() < 2 || Prefs.shelfRecent()) return false;
         HomeApps.Item it = shelf.get(shelfIndex);
-        return it.kind == HomeApps.APP && it.pkg != null;
+        return (it.kind == HomeApps.APP || HomeApps.LIVE.equals(it.pkg)) && it.pkg != null;
     }
 
     private void startReorder() {

@@ -1,7 +1,10 @@
 package io.freemytv;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -63,7 +66,26 @@ public class HomeActivity extends Activity {
                 home.postDelayed(powerOnLive, 10_000);
             }
         }
+        registerReceiver(screenOn, new IntentFilter(Intent.ACTION_SCREEN_ON));
     }
+
+    /**
+     * Fork: At power-on "Live TV" also when the TV wakes from standby (the remote's power button on most Google TVs),
+     * with the same rules as after a start: 10 s later, if no key or Home came first and our home screen is in front.
+     * Only screen on counts: the screensaver never turns the screen off.
+     */
+    private final BroadcastReceiver screenOn = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (home == null || liveWaits || !"live".equals(Prefs.powerOn())) return;   // a start's own count goes on
+            org.json.JSONObject s = HomeMode.state(HomeActivity.this);
+            if (!HomeMode.FREE.equals(s.optString("mode")) || s.optBoolean("homeReverted")) return;
+            liveWaits = true;
+            liveDark = false;
+            AppLog.w("at power-on: woke from standby, Live TV in 10 s, unless a key comes first");
+            home.removeCallbacks(powerOnLive);
+            home.postDelayed(powerOnLive, 10_000);
+        }
+    };
 
     /**
      * liveWaits: At power-on "Live TV" is still to come in this start. liveDark: the screen went off while it waited (a
@@ -150,6 +172,10 @@ public class HomeActivity extends Activity {
     private static final long TWICE_MS = 700;
 
     @Override protected void onDestroy() {
+        try {
+            unregisterReceiver(screenOn);
+        } catch (IllegalArgumentException ignored) {   // the crash screen never registered it
+        }
         if (home != null) {
             home.removeCallbacks(powerOnLive);
             home.destroy();

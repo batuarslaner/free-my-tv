@@ -179,6 +179,7 @@ final class RemoteKeys {
                             "com.smartdevice.dailyshortcut.ui.MainActivity")
                     : (TCL || PHILIPS_GTV) && pkg.equals(Prefs.QUICK_PANEL)
                     ? new Intent(c, QuickPanelActivity.class)
+                    : pkg.equals(Prefs.LIVE_TV) ? HomeApps.liveTv(c)   // fork: straight to it, as the fork always did
                     : (JVC_SKYWORTH || TCL || PHILIPS_GTV || SONY) && pkg.equals("com.android.tv.settings")
                     ? new Intent(android.provider.Settings.ACTION_SETTINGS).setPackage(pkg)
                     : launchIntent(c.getPackageManager(), pkg);

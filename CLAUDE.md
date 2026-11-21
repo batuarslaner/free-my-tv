@@ -670,6 +670,11 @@ entries; its system pieces are in `PROTECTED`. USB debugging opens ADB on 5555 t
   The fork's header weather (`HomeView.layoutWeather`, `drawTopWeather`, colored by `Symbols.drawWeather` from the
   `*_cloud`/`*_accent` PNGs) sits at the top right, left of any top button; `top_buttons` in config.properties
   (`Config.TOP_BUTTONS`: `default`, `none` or keys) seeds `Prefs.topButtons` until Top Buttons is edited on the TV.
+  The fork's Live TV card on the shelf is the pseudo-package `HomeApps.LIVE` (`freemytv:live`, also Remote Buttons'
+  Live TV value, `Prefs.LIVE_TV`): it opens what the Live TV button opens. At power-on "Live TV" also counts a wake
+  from standby (`HomeActivity.screenOn`, same 10 s and any-key rules). `power_on` and `navigation_sounds` in
+  config.properties are the first values of `Prefs.powerOn` and `Prefs.sounds`. Official shelf logos: `tools/logos.py`
+  fetches them into the git-ignored `app/assets/logos` at build time (masters only; `HomeApps` sizes them).
   The fork has no self-updates: `Updates` does nothing unless `updates=true` (`Config.UPDATES`).
 - LG and Samsung (`web/`): plain ES5 JavaScript and CSS without variables, grid or backdrop-filter, since older TVs
   (webOS 3 and 4, Tizen 3) run a Chromium from 2015 to 2017 (`tools/check.sh` greps for all of these); only transform

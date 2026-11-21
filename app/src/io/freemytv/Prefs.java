@@ -101,6 +101,8 @@ final class Prefs {
             KEY_ONN_FREE_TV = 297;
     /** A button's value that opens this home screen's All Apps. */
     static final String ALL_APPS = HomeMode.PKG + "#all";
+    /** Fork: a remote button's value that opens Live TV (HomeApps.LIVE, as fork builds before 1.5 saved it). */
+    static final String LIVE_TV = HomeApps.LIVE;
     /**
      * The JVC G24's (Skyworth) Inputs button, one key here whichever way it comes (BUTTON_16 with scan code 383 or 79,
      * or BUTTON_14 with 240: SkyworthRemote.shortcut), and its gear, NOTIFICATION; TV_SHORTCUTS and QUICK_SETTINGS
@@ -306,7 +308,7 @@ final class Prefs {
     }
 
     /** The home screen's soft click when moving and opening. */
-    static boolean sounds() { return sp().getBoolean("sounds", true); }
+    static boolean sounds() { return sp().getBoolean("sounds", Config.NAVIGATION_SOUNDS); }   // fork: navigation_sounds first
     static void setSounds(boolean on) { put("sounds", on); }
 
     /** OK on the screensaver opens the title it shows, in its app; any other key only closes it. Off: any key closes it. */
@@ -368,7 +370,7 @@ final class Prefs {
     static final String[] POWER_ON = {"tv", "home", "live"};
 
     static String powerOn() {
-        String v = sp().getString("powerOn", "tv");
+        String v = sp().getString("powerOn", Config.POWER_ON);   // fork: config.properties' power_on first
         return v.equals("home") || v.equals("live") ? v : "tv";
     }
 

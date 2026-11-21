@@ -1432,6 +1432,10 @@ public class SettingsActivity extends Activity {
                 appPkgs.add(Prefs.ALL_APPS);
                 appLabels.add(Ui.tr("All Apps"));
             }
+            if (HomeApps.liveTv(getContext()) != null) {   // fork: any button can open Live TV (KTC's Tabii button)
+                appPkgs.add(Prefs.LIVE_TV);
+                appLabels.add(Ui.tr("Live TV"));
+            }
             for (String[] f : found) {
                 appPkgs.add(f[0]);
                 appLabels.add(f[1]);
@@ -2290,7 +2294,7 @@ public class SettingsActivity extends Activity {
                 // Only the apps the shelf shows: one that was uninstalled would hold a place (and count toward the
                 // limit) without a row to take it off.
                 PackageManager pm = getContext().getPackageManager();
-                for (String pkg : HomeApps.shelfPackages(getContext())) if (HomeApps.launchIntent(pm, pkg) != null) shelfOrder.add(pkg);
+                for (String pkg : HomeApps.shelfPackages(getContext())) if (HomeApps.shelfShows(getContext(), pkg)) shelfOrder.add(pkg);
                 rebuildShelfRows(HomeApps.shelfCandidates(getContext()));
             }
             pickScroll = 0;
@@ -2592,7 +2596,7 @@ public class SettingsActivity extends Activity {
                     : Ui.tr("OK removes them; the arrows turn them on or off."))
                     : screen == POWER && powerRow() != P_SHOW && unavailable(focus) == null ? Ui.tr("OK opens the list. ← → change the value.")
                     : screen == HOME_SETTINGS && from + focus == POWER_ON_ROW && unavailable(focus) == null
-                    ? Ui.tr("Only after a full start, not from standby.")
+                    ? Ui.tr("After a full start and after standby.")
                     : screen == HOME_SETTINGS && (from + focus == keyRow() || from + focus == watchmodeRow()) ? Ui.tr("OK: send it from your phone, or type it.")
                     : screen == HOME_SETTINGS && from + focus == updatesRow() ? (Updates.ready(updates, installed)
                     ? Ui.tr("OK installs it; Android asks first.") : Ui.tr("OK checks for a new version."))

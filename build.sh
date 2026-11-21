@@ -118,6 +118,7 @@ NUVIO=false; [ "$(prop open_in_nuvio false)" = "true" ] && NUVIO=true
 # This fork is signed with your own key, so the project's releases can't update it: no update checks unless
 # updates=true (then it only says when a new upstream version is out, as upstream's own builds do).
 UPDATES=false; [ "$(prop updates false)" = "true" ] && UPDATES=true
+SOUNDS=true; [ "$(prop navigation_sounds true)" = "false" ] && SOUNDS=false
 
 # Servers on your own network (Immich, and the next feature that needs one) often answer in plain HTTP. One rule for
 # all of them: a server given as http:// must be on the local network, and only its host may skip HTTPS
@@ -188,6 +189,8 @@ final class Config {
     static final String THEME = "$(prop theme auto)";
     static final String LOOK = "$(prop look glass)";   // fork: glass or sharp
     static final String TEXT_SIZE = "$(prop text_size normal)";   // fork: normal or large
+    static final String POWER_ON = "$(prop power_on tv)";   // fork: tv, home or live, until At power-on is changed on the TV
+    static final boolean NAVIGATION_SOUNDS = $SOUNDS;   // fork: until Navigation sounds is changed on the TV
     static final String TOP_BUTTONS = "$(prop top_buttons default | tr -d ' ')";   // fork: default, none, or keys
     static final String IMMICH_SERVER = "$(prop immich_server '')";
     static final String HA_URL = "$(prop home_assistant_url '')";
@@ -218,6 +221,12 @@ mkdir -p out/res/xml
   fi
   echo '</network-security-config>'
 } > out/res/xml/network_security_config.xml
+
+# --- Fork: the shelf apps' official logos (tools/logos.py, from Wikimedia Commons; trademarks, so never in git).
+# Fetched once; offline or without rsvg-convert, the shelf lifts the logos from the apps' own TV art, as upstream does.
+if ! $GENERIC && [ -z "$(ls -A app/assets/logos 2>/dev/null)" ] && command -v python3 >/dev/null 2>&1; then
+  python3 -I tools/logos.py || echo "Logos not downloaded: the shelf uses the apps' own art."
+fi
 
 # --- Build
 

@@ -188,6 +188,10 @@ final class HomeApps {
         int max = maxShelf(c);
         for (String pkg : shelfPackages(c)) {
             if (items.size() >= max) break;
+            if (pkg.equals(LIVE)) {
+                if (liveTv(c) != null) items.add(liveCard(c));
+                continue;
+            }
             Intent launch = launchIntent(pm, pkg);
             if (launch == null) continue;
             ResolveInfo ri = pm.resolveActivity(launch, 0);
@@ -214,18 +218,71 @@ final class HomeApps {
         return Prefs.shelfRecent() ? Recent.order(c, items) : items;
     }
 
+    /**
+     * Fork: the Live TV card in the shelf's package list. Settings > Shelf moves it or takes it off like an app, and
+     * Remote Buttons can open Live TV with it too (the value fork builds before 1.5 saved, so old choices still work).
+     */
+    static final String LIVE = "freemytv:live";
+
+    /** On the shelf: an installed app, or the Live TV card (on a TV with Live TV). */
+    static boolean shelfShows(Context c, String pkg) {
+        return pkg.equals(LIVE) ? liveTv(c) != null : launchIntent(c.getPackageManager(), pkg) != null;
+    }
+
+    /**
+     * The shelf's Live TV card: the TV symbol over its name, white, on a slate card (drawn like an app's logo). It opens
+     * what the first top button opens (Home Settings > Live TV button: Live TV, or an HDMI input under its name).
+     */
+    private static Item liveCard(Context c) {
+        Item box = liveButtonInput(c);
+        Item it = box != null ? action(INPUT, "live", box.label, "live_tv") : action(LIVE_TV, "live", Ui.tr("Live TV"), "live_tv");
+        if (box != null) {
+            it.inputId = box.inputId;
+            it.number = box.number;
+        }
+        it.pkg = LIVE;
+        it.logo = liveLogo(c, it.label);
+        it.logoInk = ink(it.logo);
+        return it;
+    }
+
+    /** Made once per name (the name is part of the image). */
+    private static Bitmap liveLogo(Context c, String label) {
+        String key = "live@" + label;
+        synchronized (LOGOS) {
+            if (LOGOS.containsKey(key)) return LOGOS.get(key);
+        }
+        final float symbol = 160, gap = 26;
+        Paint text = Ui.text(Ui.displaySemibold, 56, 0xFFFFFFFF);
+        text.setTextAlign(Paint.Align.CENTER);
+        float sw = Symbols.width(c, "live_tv", symbol), sh = Symbols.height(c, "live_tv", symbol);
+        float cap = Ui.cap(text), tw = text.measureText(label);
+        int w = (int) Math.ceil(Math.max(sw, tw)) + 8, h = (int) Math.ceil(sh + gap + cap + text.descent()) + 8;
+        Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(b);
+        Symbols.draw(c, canvas, "live_tv", w / 2f, 4 + sh / 2, symbol, 0xFFFFFFFF);
+        canvas.drawText(label, w / 2f, 4 + sh + gap + cap, text);
+        Bitmap logo = trimLogo(b);
+        logo.setHasMipMap(true);
+        synchronized (LOGOS) {
+            LOGOS.put(key, logo);
+        }
+        return logo;
+    }
+
     private static String[] known(String pkg) {
         for (String[] d : SHELF) if (d[2].equals(pkg)) return d;
         return null;
     }
 
-    /** The shelf's packages in order: the user's list (Settings > Shelf), or the built-in one. */
+    /** The shelf's packages in order: the user's list (Settings > Shelf), or the built-in one (Live TV first, if any). */
     static List<String> shelfPackages(Context c) {
         List<String> custom = Prefs.shelf();
         if (custom != null) return custom;
         List<String> out = new ArrayList<>();
         Set<String> keys = new HashSet<>();
         PackageManager pm = c.getPackageManager();
+        if (liveTv(c) != null) out.add(LIVE);
         for (String[] d : SHELF) {
             if (out.size() < FEW_APPS && !keys.contains(d[0]) && launchIntent(pm, d[2]) != null) {
                 keys.add(d[0]);
@@ -240,6 +297,7 @@ final class HomeApps {
         PackageManager pm = c.getPackageManager();
         List<String[]> out = new ArrayList<>();
         Set<String> seen = new HashSet<>();
+        if (liveTv(c) != null) out.add(new String[] {LIVE, Ui.tr("Live TV")});
         for (String[] d : SHELF) if (launchIntent(pm, d[2]) != null && seen.add(d[2])) out.add(new String[] {d[2], d[1]});
         List<String[]> more = new ArrayList<>();
         for (String[] app : launchable(c)) {
